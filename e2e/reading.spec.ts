@@ -105,6 +105,22 @@ test("без сети остаётся читаемым и честно об э�
   ).toBeHidden();
 });
 
+test("отдаёт канал книгой в формате EPUB", async ({ page }) => {
+  await stubTelegram(page);
+  await addChannel(page);
+
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: /export as epub/i }).click();
+  const download = await downloading;
+
+  expect(download.suggestedFilename()).toBe("readoza-sys_sa.epub");
+  const saved = await download.path();
+  const bytes = readFileSync(saved);
+  // mimetype обязан лежать первой записью архива, иначе это не EPUB.
+  expect(bytes.subarray(30, 38).toString("utf8")).toBe("mimetype");
+  expect(bytes.byteLength).toBeGreaterThan(1000);
+});
+
 test("дочитывает канал до конца и подгружает новые окна", async ({ page }) => {
   await stubTelegram(page);
   await addChannel(page);

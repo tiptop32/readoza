@@ -154,26 +154,39 @@ export function Reader({
               : null}
       </div>
 
-      {channel.importState !== "complete" ? (
-        <footer className="reader__footer">
+      <footer className="reader__footer">
+        <div className="reader__actions">
+          {channel.importState === "complete" ? null : (
+            <button
+              type="button"
+              onClick={() => void reader.downloadAll()}
+              disabled={reader.downloading || !online}
+            >
+              {reader.downloading
+                ? `Downloading… ${reader.downloaded} posts`
+                : "Download whole channel for offline"}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => void reader.downloadAll()}
-            disabled={reader.downloading || !online}
+            onClick={() => void reader.exportEpub()}
+            disabled={reader.exporting}
           >
-            {reader.downloading
-              ? `Downloading… ${reader.downloaded} posts`
-              : "Download whole channel for offline"}
+            {reader.exporting ? "Building the book…" : "Export as EPUB"}
           </button>
-          {huge ? (
-            <p className="reader__warning">
-              This channel is large. A full download is roughly{" "}
-              {formatCount(Math.ceil(estimatedPosts / POSTS_PER_REQUEST))} requests to Telegram and
-              can take a while.
-            </p>
-          ) : null}
-        </footer>
-      ) : null}
+        </div>
+
+        {huge && channel.importState !== "complete" ? (
+          <p className="reader__warning">
+            This channel is large. A full download is roughly{" "}
+            {formatCount(Math.ceil(estimatedPosts / POSTS_PER_REQUEST))} requests to Telegram and
+            can take a while.
+          </p>
+        ) : null}
+        {channel.importState === "complete" ? null : (
+          <p className="reader__warning">The book will contain only what is downloaded so far.</p>
+        )}
+      </footer>
     </div>
   );
 }

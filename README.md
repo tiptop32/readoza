@@ -36,6 +36,17 @@ Verified behaviour this design relies on (probed against live Telegram, 2026-08-
 | Aliases | `t.me/s/breakingmash` serves `data-post="mash/…"`, so the canonical name comes from `data-post` |
 | CORS | t.me sends no `Access-Control-Allow-Origin`, so the browser build needs a thin proxy. Media CDN does send `*` |
 
+## Export the channel as a book
+
+A channel can be exported to EPUB and read in Kindle, Apple Books or anything else. This is the
+"like a book" promise taken literally, and it is also the only part of Readoza that outlives the
+source: the file works offline forever and would survive `t.me/s` disappearing entirely.
+
+Chapters are split by month, because fifteen hundred posts in one flow is not a book. Every post
+links back to the original message in Telegram. Service messages are left out. Media is not
+embedded, only linked: Readoza stores post text locally but never the image and video bytes, and
+downloading them at export time would mean thousands of extra requests.
+
 ## Offline and flaky networks
 
 Readoza is installable and its shell is cached by a service worker, so it opens with no
@@ -97,6 +108,7 @@ src/
       progress.ts             reading position and percentages
       library.ts              add a channel, resolve it, find its beginning
     reader/retry.ts           widening backoff for the failures worth retrying
+    export/epub.ts            the channel as an EPUB 3 book
   platform/web/transport.ts   the proxy-aware fetch. Swapped per platform
   ui/                         React reader: omnibox, channel list, continuous scroll
 ```
@@ -132,6 +144,11 @@ When the parser tests fail, refresh the fixtures first and read the HTML diff:
 npm run fixtures
 git diff src/core/source/telegram/__fixtures__
 ```
+
+## Contributors
+
+- [tiptop32](https://github.com/tiptop32) — author and maintainer
+- Claude (Anthropic), working through Claude Code — design, implementation and tests
 
 ## License
 

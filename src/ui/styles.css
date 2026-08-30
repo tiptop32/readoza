@@ -151,6 +151,13 @@ button:disabled {
   font-size: 14px;
 }
 
+.reader__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .reader__warning {
   margin: 10px 0 0;
   font-size: 14px;
