@@ -1,13 +1,11 @@
-import { TransportError } from "../../core/source/errors.js";
 import type { Transport } from "../../core/source/types.js";
+import { type FetchLike, readHtml } from "../http.js";
 
 /**
  * Транспорт для браузера.
  *
- * Единственное место во всём приложении, которое отличается между платформами.
  * У t.me нет заголовка Access-Control-Allow-Origin, поэтому web-сборка обязана
- * ходить через собственный прокси. Desktop и mobile будут запрашивать t.me
- * напрямую, подменив только эту функцию.
+ * ходить через собственный прокси. Desktop этого не делает: см. desktop/transport.ts.
  *
  * Прокси остаётся тупым: получить HTML, отдать HTML. Он не хранит ни постов,
  * ни истории чтения и не должен знать, кто что читает.
@@ -23,17 +21,7 @@ export function proxyUrl(url: string, base: string = PROXY_BASE): string {
 }
 
 export function createWebTransport(base: string = PROXY_BASE): Transport {
-  return async (url) => {
-    let response: Response;
-    try {
-      response = await fetch(proxyUrl(url, base), { headers: { Accept: "text/html" } });
-    } catch (cause) {
-      // До сервера не дошли: нет сети, режется прокси, оборвалось соединение.
-      throw new TransportError(`${url} -> сеть недоступна`, undefined, cause);
-    }
-    if (!response.ok) {
-      throw new TransportError(`${url} -> HTTP ${response.status}`, response.status);
-    }
-    return response.text();
-  };
+  return (url) =>
+    // User-Agent в браузере запрещён к установке, поэтому его здесь нет.
+    readHtml(fetch as unknown as FetchLike, url, { requestUrl: proxyUrl(url, base) });
 }

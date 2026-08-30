@@ -109,7 +109,10 @@ src/
       library.ts              add a channel, resolve it, find its beginning
     reader/retry.ts           widening backoff for the failures worth retrying
     export/epub.ts            the channel as an EPUB 3 book
-  platform/web/transport.ts   the proxy-aware fetch. Swapped per platform
+  platform/
+    http.ts                   fetch HTML, or fail with an error that says whether
+                              retrying is worth it
+    web/transport.ts          browser: through a proxy, because of CORS
   ui/                         React reader: omnibox, channel list, continuous scroll
 ```
 

@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import type { ProgressView } from "../core/reader/progress.js";
 import type { Source } from "../core/source/types.js";
 import type { Channel, Repo } from "../core/storage/types.js";
-import { formatCount, formatLastRead, formatMonth, formatPercent } from "./format.js";
+import { formatCount, formatLastRead, formatMonth, formatPercent, formatSpan } from "./format.js";
 import { useChannelActions } from "./useChannelActions.js";
 
 /** Замер на живом Telegram: одна страница ленты это около 20 постов. */
@@ -55,9 +55,13 @@ export function ChannelEntry({
               <span className="entry__bar-fill" style={{ width: `${percent}%` }} />
             </span>
             <span className="entry__meta">
-              {started
-                ? `${formatPercent(percent)} · ${formatMonth(view?.atDate)} · ${formatCount(view?.readCount ?? 0)} posts read`
-                : `not started · ${formatMonth(channel.firstPostDate)}`}
+              {/* Пока прогресс не прочитан из хранилища, «not started» было бы
+                  враньём: канал может быть начат. Показываем то, что точно знаем. */}
+              {view === undefined
+                ? formatSpan(channel.firstPostDate, channel.lastPostDate)
+                : started
+                  ? `${formatPercent(percent)} · ${formatMonth(view.atDate)} · ${formatCount(view.readCount)} posts read`
+                  : `not started · ${formatMonth(channel.firstPostDate)}`}
               {view?.totalCount ? ` of ${formatCount(view.totalCount)}` : ""}
             </span>
             {view?.lastReadAt ? (

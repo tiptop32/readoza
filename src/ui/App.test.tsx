@@ -84,7 +84,8 @@ describe("поток целиком", () => {
 
     // Якорь на начало имени: у кнопки удаления имя тоже содержит название канала.
     const entry = await screen.findByRole("button", { name: /^Канал sys_sa/ });
-    expect(screen.getByText(/posts read/)).toBeDefined();
+    // Прогресс на карточке подтягивается асинхронно, поэтому ждём, а не читаем сразу.
+    expect(await screen.findByText(/posts read/)).toBeDefined();
 
     await user.click(entry);
     await waitFor(() => expect(screen.getByText("пост 5")).toBeDefined());
