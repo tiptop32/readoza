@@ -6,8 +6,14 @@ Telegram drops you at the newest message. Readoza does the opposite: it finds po
 public channel, walks forward in chronological order, and remembers your position between
 sessions. Local-first, no account, no server for the core loop.
 
-> Status: **v0.1 in progress.** The data layer (source + parser) is done and tested.
-> Storage, reader UI and the "continue reading" screen are next.
+> Status: **v0.1 works end to end in the browser.** Paste a channel, read from post one,
+> close the tab, come back to the same place. Desktop and mobile builds, offline export and
+> bookmarks are next.
+
+```bash
+npm install
+npm run dev     # http://localhost:5173
+```
 
 ## How it reads a channel
 
@@ -44,26 +50,42 @@ login, which is a much larger project than the rest of Readoza combined.
 ## Architecture
 
 ```
-UI  ──  reader logic  ──┬── Repository (local storage)
+UI  ──  reader logic  ──┬── Repository (IndexedDB)
                         └── Source ── Transport   ← the only platform-specific piece
 ```
+
+Storage is IndexedDB rather than SQLite, because it behaves identically in the browser, the
+Capacitor webview and the Tauri webview with no platform-specific code at all. SQLite would
+buy SQL and full-text search at the price of three different drivers, and v0.1 has no search.
+
+Reading position is a message id, never an ordinal, so a deleted post cannot shift where you
+left off. The percentage is derived from the id range and is deliberately approximate; the
+main indicator in the UI is the date. An exact "N of M" only appears once a channel has been
+fully downloaded, because Telegram never exposes a post count.
+
+In development the browser reaches Telegram through Vite's own proxy (`/tg` in
+`vite.config.ts`), so there is no service to run alongside the app. A deployed web build needs
+the same thing as a small stateless proxy: fetch HTML, return HTML, keep no reading history.
 
 `Source` builds URLs and parses HTML. It knows nothing about networking: the `Transport`
 function is injected at the composition root, so the browser build can route through a proxy
 while desktop and mobile talk to `t.me` directly, with zero difference in the rest of the code.
 
 ```
-src/core/
-  model.ts                    domain types, source-agnostic
-  source/
-    types.ts                  Source + Transport interfaces
-    telegram/
+src/
+  core/                       no DOM chrome, no platform assumptions
+    model.ts                  domain types, source-agnostic
+    source/telegram/
       parse.ts                HTML -> domain. All fragility lives here
       source.ts               URL building, input resolution, start-of-channel search
-      parse.test.ts           golden tests over real fixtures
-      source.test.ts          URL/cursor logic against a fake transport
-      live.test.ts            opt-in network test (READOZA_LIVE=1)
       __fixtures__/           real Telegram HTML, refreshed by scripts/fetch-fixtures.sh
+    storage/                  Repo contract + IndexedDB implementation
+    reader/
+      importer.ts             resumable crawl, one page at a time
+      progress.ts             reading position and percentages
+      library.ts              add a channel, resolve it, find its beginning
+  platform/web/transport.ts   the proxy-aware fetch. Swapped per platform
+  ui/                         React reader: omnibox, channel list, continuous scroll
 ```
 
 ## Development

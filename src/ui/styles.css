@@ -1,0 +1,389 @@
+/* Одна колонка, спокойная типографика, ничего лишнего вокруг текста. */
+
+:root {
+  --bg: #fdfcfa;
+  --surface: #ffffff;
+  --text: #1c1b19;
+  --muted: #6b6862;
+  --line: #e6e2db;
+  --accent: #2b6cb0;
+  --read: #a8a49c;
+  --measure: 68ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171a;
+    --surface: #1d1f23;
+    --text: #e8e6e3;
+    --muted: #9b9790;
+    --line: #2c2f34;
+    --accent: #7aa7d9;
+    --read: #6a675f;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ---------- главный экран ---------- */
+
+.home {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 64px 20px 96px;
+}
+
+.home__logo {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+}
+
+.home__tagline {
+  margin: 8px 0 32px;
+  color: var(--muted);
+}
+
+.add__input {
+  width: 100%;
+  padding: 14px 16px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.add__hint {
+  margin: 10px 2px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.card__title {
+  display: block;
+}
+
+.card__meta {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.card__description {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.notice--error {
+  color: #b23c2c;
+  font-size: 15px;
+}
+
+/* ---------- список каналов ---------- */
+
+.library {
+  margin-top: 48px;
+}
+
+.library__heading {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.library__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.entry__main {
+  flex: 1;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 4px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.entry__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.entry__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.entry__bar {
+  display: block;
+  height: 4px;
+  margin: 8px 0 6px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.entry__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.entry__meta {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.entry__meta--dim {
+  opacity: 0.7;
+}
+
+.entry__remove {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 20px;
+  padding: 8px 10px;
+}
+
+/* ---------- читалка ---------- */
+
+.reader__bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.reader__back {
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.reader__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.reader__title span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.reader__percent {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.reader__progress {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.2s ease-out;
+}
+
+.reader__posts {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 24px 20px 0;
+}
+
+.reader__sentinel,
+.reader__footer {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: center;
+}
+
+/* ---------- пост ---------- */
+
+.post {
+  padding: 20px 0 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.post--service {
+  font-size: 14px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.post--read .post__meta time {
+  color: var(--read);
+}
+
+.post__meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.post__text {
+  overflow-wrap: anywhere;
+}
+
+.post__text pre {
+  overflow-x: auto;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.post__media {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.post__media--album {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.post__photo,
+.post__video {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  display: block;
+}
+
+.post__document {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+.post__document-size {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.post__link-preview {
+  display: block;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 8px 8px 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.post__link-preview img {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.post__link-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.post__link-preview-body span {
+  color: var(--muted);
+}
+
+/* Эмодзи Telegram: картинку из style мы вырезаем при санитизации,
+   внутри остаётся настоящий символ, его и показываем. */
+.post__text .emoji {
+  font-style: normal;
+}

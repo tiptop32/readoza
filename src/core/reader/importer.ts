@@ -68,6 +68,58 @@ function widenBounds(channel: Channel, page: Page): Channel {
   return next;
 }
 
+export interface ImportStep {
+  /** Сколько постов пришло на этой странице. */
+  posts: number;
+  lastId?: number;
+  /** Канал дочитан до конца. */
+  done: boolean;
+}
+
+/**
+ * Одна страница докачки: элементарный шаг, из которого собраны и фоновый обход,
+ * и подгрузка по мере чтения, когда читалка упирается в край локального кэша.
+ * Курсор сохраняется здесь же, поэтому шаг безопасно прервать в любой момент.
+ */
+export async function importNextPage(
+  repo: Repo,
+  source: Source,
+  channelId: string,
+): Promise<ImportStep> {
+  const stored = await repo.getChannel(channelId);
+  if (!stored) throw new Error(`канал не найден в хранилище: ${channelId}`);
+  if (stored.importState === "complete") {
+    const step: ImportStep = { posts: 0, done: true };
+    if (stored.lastPostId !== undefined) step.lastId = stored.lastPostId;
+    return step;
+  }
+
+  const cursor: Cursor = stored.importCursor ?? { kind: "start" };
+  const page = await source.fetchPage(stored.username, cursor);
+
+  let channel = stored;
+  if (page.posts.length > 0) {
+    await repo.putPosts(channelId, page.posts);
+    channel = widenBounds(channel, page);
+  }
+
+  // Конец канала: Telegram не отдал курсор вперёд.
+  // Тот же курсор второй раз означает, что лента не двигается, и это тоже конец.
+  const done = !page.next || sameCursor(page.next, cursor);
+  if (done) {
+    const { importCursor: _drop, ...rest } = channel;
+    channel = { ...rest, importState: "complete", postCount: await repo.countPosts(channelId) };
+  } else {
+    channel = { ...channel, importState: "partial", importCursor: page.next };
+  }
+  await repo.putChannel(channel);
+
+  const step: ImportStep = { posts: page.posts.length, done };
+  const lastId = page.posts.at(-1)?.id;
+  if (lastId !== undefined) step.lastId = lastId;
+  return step;
+}
+
 /**
  * Докачивает канал от сохранённого курсора до конца.
  * Возвращает итог запуска; при `aborted` вызов можно просто повторить позже.
@@ -97,45 +149,26 @@ export async function importChannel(
     return result;
   }
 
-  let channel = stored;
-  let cursor: Cursor = channel.importCursor ?? { kind: "start" };
-
   while (result.pages < maxPages) {
     if (signal?.aborted) {
       result.aborted = true;
       break;
     }
 
-    const page = await source.fetchPage(channel.username, cursor);
+    const step = await importNextPage(repo, source, channelId);
     result.pages += 1;
+    result.posts += step.posts;
+    if (step.lastId !== undefined) result.lastId = step.lastId;
 
-    if (page.posts.length > 0) {
-      await repo.putPosts(channelId, page.posts);
-      result.posts += page.posts.length;
-      result.lastId = page.posts.at(-1)?.id ?? result.lastId;
-      channel = widenBounds(channel, page);
-    }
-
-    // Конец канала: Telegram не отдал курсор вперёд.
-    // Тот же курсор второй раз означает, что лента не двигается, и это тоже конец.
-    if (!page.next || sameCursor(page.next, cursor)) {
+    if (step.done) {
       result.done = true;
       break;
     }
 
-    cursor = page.next;
-    channel = { ...channel, importState: "partial", importCursor: cursor };
-    await repo.putChannel(channel);
     onProgress?.({ ...result });
-
     await sleep(delayMs);
   }
 
-  if (result.done) {
-    const { importCursor: _drop, ...rest } = channel;
-    channel = { ...rest, importState: "complete", postCount: await repo.countPosts(channelId) };
-  }
-  await repo.putChannel(channel);
   onProgress?.({ ...result });
   return result;
 }
