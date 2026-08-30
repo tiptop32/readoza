@@ -105,6 +105,40 @@ test("без сети остаётся читаемым и честно об э�
   ).toBeHidden();
 });
 
+test("после возврата даёт листать назад к прочитанному", async ({ page }) => {
+  await stubTelegram(page);
+  await addChannel(page);
+
+  // Читаем вглубь канала, чтобы позиция ушла далеко от начала.
+  for (let i = 0; i < 6; i += 1) {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(300);
+  }
+  await page.waitForTimeout(1200); // сохранение позиции
+
+  await page.reload();
+  await page.getByRole("button", { name: /^Системный Аналитик/ }).click();
+  await expect(page.locator("[data-post-id]").first()).toBeVisible();
+
+  // Открылись не с начала канала: позиция восстановлена.
+  const firstLoaded = await page.$$eval("[data-post-id]", (nodes) =>
+    Math.min(...nodes.map((node) => Number((node as HTMLElement).dataset["postId"]))),
+  );
+  expect(firstLoaded).toBeGreaterThan(1);
+
+  // Листаем вверх, пока не упрёмся в самое начало канала.
+  const start = page.getByText("This is the first post of the channel.");
+  let reachedStart = false;
+  for (let attempt = 0; attempt < 40 && !reachedStart; attempt += 1) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(300);
+    reachedStart = await start.isVisible();
+  }
+
+  expect(reachedStart).toBe(true);
+  await expect(page.locator("#post-1")).toBeAttached();
+});
+
 test("отдаёт канал книгой в формате EPUB с карточки на главной", async ({ page }) => {
   await stubTelegram(page);
   await addChannel(page);

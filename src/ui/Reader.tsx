@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { percentByIds } from "../core/reader/progress.js";
 import type { Source } from "../core/source/types.js";
@@ -33,17 +33,40 @@ export function Reader({
   const [currentId, setCurrentId] = useState<number | undefined>(reader.anchorId);
   const listRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   const restoredRef = useRef(false);
+  const [restored, setRestored] = useState(false);
+  /** Высота документа до вставки постов сверху, чтобы вернуть прокрутку на место. */
+  const heightBeforePrepend = useRef<number | null>(null);
 
   // Возврат к позиции чтения после первой загрузки окна.
   useEffect(() => {
     if (reader.loading || restoredRef.current) return;
     restoredRef.current = true;
+    setRestored(true);
     if (reader.anchorId === undefined) return;
     const target = document.getElementById(`post-${reader.anchorId}`);
     target?.scrollIntoView({ block: "start" });
     setCurrentId(reader.anchorId);
   }, [reader.loading, reader.anchorId]);
+
+  /**
+   * Подгрузка вверх сдвигает всё содержимое вниз ровно на высоту добавленного.
+   * Без компенсации читатель, доскроллив до верха, каждый раз улетал бы вперёд.
+   */
+  const loadEarlier = useCallback(async () => {
+    if (reader.atStart) return;
+    heightBeforePrepend.current = document.documentElement.scrollHeight;
+    await reader.loadEarlier();
+  }, [reader]);
+
+  useLayoutEffect(() => {
+    const before = heightBeforePrepend.current;
+    if (before === null) return;
+    heightBeforePrepend.current = null;
+    const delta = document.documentElement.scrollHeight - before;
+    if (delta > 0) window.scrollBy(0, delta);
+  }, [reader.posts]);
 
   // Определение текущего поста по полосе на трети экрана.
   useEffect(() => {
@@ -69,6 +92,21 @@ export function Reader({
     const timer = setTimeout(() => reader.markRead(currentId), SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [currentId, reader.markRead]);
+
+  // Подгрузка предыдущего окна при движении вверх. Включается только после
+  // восстановления позиции: иначе сработала бы на нулевой прокрутке при открытии.
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    if (!sentinel || !restored || reader.atStart) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadEarlier();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [restored, reader.atStart, loadEarlier]);
 
   // Подгрузка следующего окна, когда низ списка приблизился.
   useEffect(() => {
@@ -118,6 +156,10 @@ export function Reader({
           </button>
         </p>
       ) : null}
+
+      <div ref={topSentinelRef} className="reader__sentinel reader__sentinel--top">
+        {reader.atStart ? "This is the first post of the channel." : "Loading earlier posts…"}
+      </div>
 
       <div className="reader__posts" ref={listRef}>
         {reader.posts.map((post) => (

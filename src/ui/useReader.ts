@@ -19,6 +19,10 @@ export interface ReaderApi {
   /** Позиция, на которую нужно проскроллить после первой загрузки. */
   anchorId?: number;
   loadMore: () => Promise<void>;
+  /** Подгрузить посты выше текущего окна: возврат к уже прочитанному. */
+  loadEarlier: () => Promise<void>;
+  /** Выше ничего нет: это первый пост канала. */
+  atStart: boolean;
   /** Повторить последнюю неудавшуюся подгрузку после сбоя сети. */
   retry: () => Promise<void>;
   markRead: (postId: number) => void;
@@ -42,11 +46,13 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
   const [posts, setPosts] = useState<StoredPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
+  const [atStart, setAtStart] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [anchorId, setAnchorId] = useState<number | undefined>();
 
   const progressRef = useRef<Progress | undefined>(undefined);
   const busyRef = useRef(false);
+  const earlierRef = useRef(false);
 
   /** Канал докачан до конца, дальше постов не появится. */
   const checkEnd = useCallback(async (): Promise<void> => {
@@ -74,6 +80,7 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     let cancelled = false;
     setLoading(true);
     setAtEnd(false);
+    setAtStart(false);
     setError(undefined);
     setPosts([]);
 
@@ -91,6 +98,8 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
 
         setPosts(merge([...before].reverse(), after));
         setAnchorId(progress?.lastReadId);
+        // Окно назад неполное — значит выше уже ничего нет.
+        if (before.length < LOOKBACK) setAtStart(true);
         if (after.length < WINDOW) await checkEnd();
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
@@ -123,6 +132,31 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     }
   }, [atEnd, loading, posts, channel.firstPostId, fillForward, checkEnd]);
 
+  /**
+   * Подгрузка вверх. В сеть не ходит и не должна: читаем канал только вперёд
+   * от первого поста, поэтому всё, что выше текущей позиции, уже лежит локально.
+   */
+  const loadEarlier = useCallback(async () => {
+    if (earlierRef.current || atStart || loading) return;
+    const firstId = posts[0]?.id;
+    if (firstId === undefined) return;
+
+    earlierRef.current = true;
+    try {
+      const batch = await repo.getPosts(channel.id, {
+        toId: firstId - 1,
+        limit: WINDOW,
+        direction: "backward",
+      });
+      if (batch.length > 0) setPosts((prev) => merge([...batch].reverse(), prev));
+      if (batch.length < WINDOW) setAtStart(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      earlierRef.current = false;
+    }
+  }, [atStart, loading, posts, repo, channel.id]);
+
   const retry = useCallback(async () => {
     setError(undefined);
     await loadMore();
@@ -141,7 +175,9 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     posts,
     loading,
     atEnd,
+    atStart,
     loadMore,
+    loadEarlier,
     retry,
     markRead,
   };
