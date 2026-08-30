@@ -1,5 +1,5 @@
 import type { Source } from "../source/types.js";
-import { newChannel } from "../storage/types.js";
+import { newChannel, readFrontier } from "../storage/types.js";
 import type { Channel, Repo } from "../storage/types.js";
 import { describeProgress, type ProgressView } from "./progress.js";
 
@@ -102,7 +102,8 @@ export async function channelProgress(repo: Repo, channelId: string): Promise<Pr
   if (!progress) return describeProgress({ channel });
 
   const [readCount, post] = await Promise.all([
-    repo.countPosts(channelId, progress.lastReadId),
+    // Сколько прочитано — по границе, куда вернуться — по фактической позиции.
+    repo.countPosts(channelId, readFrontier(progress)),
     repo.getPost(channelId, progress.lastReadId),
   ]);
   const input = { channel, progress, readCount, ...(post?.date ? { atDate: post.date } : {}) };

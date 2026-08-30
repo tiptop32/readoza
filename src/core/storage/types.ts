@@ -38,10 +38,26 @@ export interface StoredPost extends Post {
 
 export interface Progress {
   channelId: string;
-  /** Позиция хранится как message id, а не как порядковый номер: id переживает удаление постов. */
+  /**
+   * Где читатель остановился. Двигается в обе стороны: отлистал назад,
+   * закрыл приложение — вернуться нужно туда, а не к самому дальнему посту.
+   *
+   * Хранится как message id, а не как порядковый номер: id переживает удаление.
+   */
   lastReadId: number;
+  /**
+   * Самый дальний прочитанный пост. Только вперёд, поэтому перечитывание не
+   * откатывает процент и счётчик. У записей, созданных до появления поля,
+   * его нет — читать через readFrontier.
+   */
+  furthestReadId?: number;
   lastReadAt: string;
   startedAt: string;
+}
+
+/** Граница прочитанного с запасом на записи, сделанные до появления поля. */
+export function readFrontier(progress: Progress): number {
+  return Math.max(progress.furthestReadId ?? 0, progress.lastReadId);
 }
 
 export interface Bookmark {

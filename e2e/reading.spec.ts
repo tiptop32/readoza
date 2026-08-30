@@ -113,6 +113,45 @@ test("без сети остаётся читаемым и честно об э�
   ).toBeHidden();
 });
 
+test("возвращает туда, где остановился, а не к самому дальнему прочитанному", async ({ page }) => {
+  await stubTelegram(page);
+  await addChannel(page);
+
+  // Уходим вглубь канала.
+  for (let i = 0; i < 8; i += 1) {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(250);
+  }
+  await page.waitForTimeout(1200);
+  const deepId = await page.$$eval(".post--read", (nodes) =>
+    Math.max(...nodes.map((node) => Number((node as HTMLElement).dataset["postId"]))),
+  );
+  expect(deepId).toBeGreaterThan(10);
+
+  // И сознательно отматываем назад, к началу.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1500);
+
+  await page.reload();
+  // Прогресс не обнулился от перечитывания: процент считается по границе.
+  await expect(page.getByText(/posts read/)).toBeVisible();
+  await page.getByRole("button", { name: /^Системный Аналитик/ }).click();
+  await expect(page.locator("[data-post-id]").first()).toBeVisible();
+
+  // Открылись там, где реально остановились, а не на самом дальнем посте.
+  const landedOn = await page.$$eval("[data-post-id]", (nodes) => {
+    const seen = nodes
+      .map((node) => ({
+        id: Number((node as HTMLElement).dataset["postId"]),
+        y: node.getBoundingClientRect().top,
+      }))
+      .filter((post) => post.y > -200)
+      .sort((a, b) => a.y - b.y);
+    return seen[0]?.id ?? -1;
+  });
+  expect(landedOn).toBeLessThan(deepId);
+});
+
 test("открывает картинку во весь экран", async ({ page }) => {
   await stubTelegram(page);
   await addChannel(page);

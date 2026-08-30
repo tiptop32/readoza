@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Channel, Progress } from "../storage/types.js";
-import { advanceRead, describeProgress, percentByIds, setReadPosition } from "./progress.js";
+import { describeProgress, percentByIds, updateRead } from "./progress.js";
 
 const channel: Channel = {
   id: "telegram-public:sys_sa",
@@ -39,37 +39,44 @@ describe("percentByIds", () => {
   });
 });
 
-describe("advanceRead", () => {
+describe("updateRead", () => {
+  const now = new Date("2026-08-30T12:00:00.000Z");
+
   it("создаёт прогресс при первом чтении", () => {
-    const now = new Date("2026-08-30T12:00:00.000Z");
-    const p = advanceRead(undefined, channel.id, 5, now);
+    const p = updateRead(undefined, channel.id, 5, now);
     expect(p.lastReadId).toBe(5);
+    expect(p.furthestReadId).toBe(5);
     expect(p.startedAt).toBe(now.toISOString());
   });
 
-  it("двигает позицию вперёд", () => {
-    const p = advanceRead(progress, channel.id, 700, new Date("2026-08-30T12:00:00.000Z"));
+  it("двигает позицию вперёд вместе с границей", () => {
+    const p = updateRead(progress, channel.id, 700, now);
     expect(p.lastReadId).toBe(700);
+    expect(p.furthestReadId).toBe(700);
     expect(p.startedAt).toBe(progress.startedAt);
   });
 
-  it("не откатывает позицию при перечитывании назад", () => {
-    const p = advanceRead(progress, channel.id, 100, new Date("2026-08-30T12:00:00.000Z"));
-    expect(p.lastReadId).toBe(501);
-    expect(p.lastReadAt).toBe("2026-08-30T12:00:00.000Z");
-  });
-});
-
-describe("setReadPosition", () => {
-  it("переносит позицию явно, в том числе назад", () => {
-    const p = setReadPosition(progress, channel.id, 10, new Date("2026-08-30T12:00:00.000Z"));
-    expect(p.lastReadId).toBe(10);
-    expect(p.startedAt).toBe(progress.startedAt);
+  it("идёт назад вместе с читателем: остановился он именно там", () => {
+    const p = updateRead(progress, channel.id, 100, now);
+    expect(p.lastReadId).toBe(100);
+    expect(p.lastReadAt).toBe(now.toISOString());
   });
 
-  it("начинает заново на чистом канале", () => {
-    const now = new Date("2026-08-30T12:00:00.000Z");
-    expect(setReadPosition(undefined, channel.id, 1, now).startedAt).toBe(now.toISOString());
+  it("но границу прочитанного назад не откатывает", () => {
+    const p = updateRead(progress, channel.id, 100, now);
+    expect(p.furthestReadId).toBe(501);
+    // и повторный проход вперёд по уже прочитанному её не ломает
+    expect(updateRead(p, channel.id, 200, now).furthestReadId).toBe(501);
+  });
+
+  it("понимает записи, сделанные до появления границы", () => {
+    const legacy: Progress = {
+      channelId: channel.id,
+      lastReadId: 900,
+      lastReadAt: now.toISOString(),
+      startedAt: now.toISOString(),
+    };
+    expect(updateRead(legacy, channel.id, 50, now).furthestReadId).toBe(900);
   });
 });
 
@@ -91,6 +98,18 @@ describe("describeProgress", () => {
     expect(view.percent).toBeCloseTo(50, 5);
     expect(view.readCount).toBe(214);
     expect(view.atDate).toBe("2023-04-12T09:00:00+00:00");
+  });
+
+  it("считает процент по границе, а не по позиции после отлистывания назад", () => {
+    // Читатель дошёл до 501 и вернулся к 100: прогресс не должен обнулиться.
+    const rewound = describeProgress({
+      channel,
+      progress: { ...progress, lastReadId: 100, furthestReadId: 501 },
+      readCount: 214,
+    });
+    expect(rewound.percent).toBeCloseTo(50, 5);
+    expect(rewound.lastReadId).toBe(100);
+    expect(rewound.furthestReadId).toBe(501);
   });
 
   it("отдаёт точный знаменатель только после полной докачки", () => {

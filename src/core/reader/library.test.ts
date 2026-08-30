@@ -4,7 +4,7 @@ import type { Cursor } from "../model.js";
 import { createIdbRepo } from "../storage/idb.js";
 import type { Repo } from "../storage/types.js";
 import { addChannel, channelProgress, ReadozaError, touchChannel } from "./library.js";
-import { advanceRead } from "./progress.js";
+import { updateRead } from "./progress.js";
 import { makeFakeSource } from "./testSource.js";
 
 const IDS = [1, 2, 4, 5, 8, 13, 21, 34, 55, 89];
@@ -85,7 +85,7 @@ describe("channelProgress", () => {
   it("считает позицию, дату остановки и число прочитанного", async () => {
     const source = makeFakeSource("sys_sa", IDS);
     const channel = await addChannel(repo, source, "@sys_sa");
-    await repo.setProgress(advanceRead(undefined, channel.id, 5));
+    await repo.setProgress(updateRead(undefined, channel.id, 5));
 
     const view = await channelProgress(repo, channel.id);
     expect(view?.lastReadId).toBe(5);

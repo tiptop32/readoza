@@ -88,12 +88,17 @@ export function Reader({
     return () => observer.disconnect();
   }, [reader.posts]);
 
-  // Сохранение позиции с задержкой.
+  /*
+   * Сохранение позиции с задержкой, и только после восстановления: позиция
+   * ходит в обе стороны, а до восстановления страница стоит на нуле, где в
+   * полосу попадают посты выше сохранённого места. Без этой проверки открытие
+   * канала само откатывало бы позицию к началу загруженного окна.
+   */
   useEffect(() => {
-    if (currentId === undefined) return;
+    if (!restored || currentId === undefined) return;
     const timer = setTimeout(() => reader.markRead(currentId), SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [currentId, reader.markRead]);
+  }, [restored, currentId, reader.markRead]);
 
   // Подгрузка предыдущего окна при движении вверх. Включается только после
   // восстановления позиции: иначе сработала бы на нулевой прокрутке при открытии.
@@ -129,6 +134,7 @@ export function Reader({
       ? percentByIds(channel.firstPostId, channel.lastPostId, currentId)
       : 0;
   const currentDate = reader.posts.find((post) => post.id === currentId)?.date;
+  const readMark = Math.max(currentId ?? 0, reader.furthestReadId ?? 0);
 
   const lightboxPhotos = lightbox
     ? (reader.posts
@@ -174,7 +180,9 @@ export function Reader({
           <PostView
             key={post.id}
             post={post}
-            read={currentId !== undefined && post.id <= currentId}
+            // Прочитанным помечает граница, а не текущий взгляд: отлистав назад,
+            // читатель не должен видеть уже пройденное как непрочитанное.
+            read={post.id <= readMark}
             onOpenImage={(index) => setLightbox({ postId: post.id, index })}
           />
         ))}

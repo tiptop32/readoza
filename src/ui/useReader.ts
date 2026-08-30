@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { importNextPage } from "../core/reader/importer.js";
-import { advanceRead } from "../core/reader/progress.js";
+import { updateRead } from "../core/reader/progress.js";
+import { readFrontier } from "../core/storage/types.js";
 import type { Source } from "../core/source/types.js";
 import type { Channel, Progress, Repo, StoredPost } from "../core/storage/types.js";
 
@@ -18,6 +19,8 @@ export interface ReaderApi {
   error?: string;
   /** Позиция, на которую нужно проскроллить после первой загрузки. */
   anchorId?: number;
+  /** Граница прочитанного: до сюда посты помечаются прочитанными. */
+  furthestReadId?: number;
   loadMore: () => Promise<void>;
   /** Подгрузить посты выше текущего окна: возврат к уже прочитанному. */
   loadEarlier: () => Promise<void>;
@@ -49,6 +52,7 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
   const [atStart, setAtStart] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [anchorId, setAnchorId] = useState<number | undefined>();
+  const [furthestReadId, setFurthestReadId] = useState<number | undefined>();
 
   const progressRef = useRef<Progress | undefined>(undefined);
   const busyRef = useRef(false);
@@ -98,6 +102,7 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
 
         setPosts(merge([...before].reverse(), after));
         setAnchorId(progress?.lastReadId);
+        setFurthestReadId(progress ? readFrontier(progress) : undefined);
         // Окно назад неполное — значит выше уже ничего нет.
         if (before.length < LOOKBACK) setAtStart(true);
         if (after.length < WINDOW) await checkEnd();
@@ -164,8 +169,9 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
 
   const markRead = useCallback(
     (postId: number) => {
-      const next = advanceRead(progressRef.current, channel.id, postId);
+      const next = updateRead(progressRef.current, channel.id, postId);
       progressRef.current = next;
+      setFurthestReadId(readFrontier(next));
       void repo.setProgress(next);
     },
     [repo, channel.id],
@@ -183,5 +189,6 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
   };
   if (error) api.error = error;
   if (anchorId !== undefined) api.anchorId = anchorId;
+  if (furthestReadId !== undefined) api.furthestReadId = furthestReadId;
   return api;
 }

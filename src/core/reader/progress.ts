@@ -1,3 +1,4 @@
+import { readFrontier } from "../storage/types.js";
 import type { Channel, Progress } from "../storage/types.js";
 
 /**
@@ -13,8 +14,10 @@ import type { Channel, Progress } from "../storage/types.js";
  */
 
 export interface ProgressView {
-  /** Позиция чтения. undefined, если канал ещё не открывали. */
+  /** Куда вернуться. undefined, если канал ещё не открывали. */
   lastReadId?: number;
+  /** Самый дальний прочитанный пост: по нему считаются процент и счётчик. */
+  furthestReadId?: number;
   /** 0..100, приблизительно, по диапазону id. */
   percent: number;
   /** Сколько постов прочитано из тех, что уже лежат локально. Честное число. */
@@ -58,13 +61,17 @@ export function describeProgress({
   }
   if (!progress) return view;
 
+  const frontier = readFrontier(progress);
   view.lastReadId = progress.lastReadId;
+  view.furthestReadId = frontier;
   view.startedAt = progress.startedAt;
   view.lastReadAt = progress.lastReadAt;
   if (atDate) view.atDate = atDate;
 
+  // Процент считается по границе, а не по текущей позиции: иначе прокрутка
+  // назад для перечитывания выглядела бы как потеря прогресса.
   if (channel.firstPostId !== undefined && channel.lastPostId !== undefined) {
-    view.percent = percentByIds(channel.firstPostId, channel.lastPostId, progress.lastReadId);
+    view.percent = percentByIds(channel.firstPostId, channel.lastPostId, frontier);
   } else if (view.totalCount) {
     view.percent = Math.min(100, (readCount / view.totalCount) * 100);
   }
@@ -72,36 +79,24 @@ export function describeProgress({
 }
 
 /**
- * Двигает позицию только вперёд. Прокрутка назад для перечитывания не должна
- * откатывать прогресс: «прочитано до сюда» это граница, а не текущий взгляд.
+ * Обновляет позицию чтения.
+ *
+ * Позиция идёт туда же, куда читатель: отлистал назад — вернёмся назад, потому
+ * что остановился он именно там. Граница прочитанного при этом только растёт,
+ * иначе перечитывание съедало бы процент и счётчик прочитанного.
  */
-export function advanceRead(
+export function updateRead(
   current: Progress | undefined,
   channelId: string,
   postId: number,
   now = new Date(),
 ): Progress {
   const at = now.toISOString();
-  if (!current) {
-    return { channelId, lastReadId: postId, lastReadAt: at, startedAt: at };
-  }
-  if (postId <= current.lastReadId) {
-    return { ...current, lastReadAt: at };
-  }
-  return { ...current, lastReadId: postId, lastReadAt: at };
-}
-
-/** Явный перенос позиции, в том числе назад: «начать заново», переход по закладке. */
-export function setReadPosition(
-  current: Progress | undefined,
-  channelId: string,
-  postId: number,
-  now = new Date(),
-): Progress {
-  const at = now.toISOString();
+  const frontier = Math.max(current ? readFrontier(current) : 0, postId);
   return {
     channelId,
     lastReadId: postId,
+    furthestReadId: frontier,
     lastReadAt: at,
     startedAt: current?.startedAt ?? at,
   };
