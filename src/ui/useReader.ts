@@ -51,6 +51,12 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
   const progressRef = useRef<Progress | undefined>(undefined);
   const busyRef = useRef(false);
 
+  /** Канал докачан до конца, дальше постов не появится. */
+  const checkEnd = useCallback(async (): Promise<void> => {
+    const fresh = await repo.getChannel(channel.id);
+    if (fresh?.importState === "complete") setAtEnd(true);
+  }, [repo, channel.id]);
+
   /** Отдаёт окно постов от fromId, дотягивая страницы из сети, если локально пусто. */
   const fillForward = useCallback(
     async (fromId: number, limit: number): Promise<StoredPost[]> => {
@@ -88,6 +94,7 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
 
         setPosts(merge([...before].reverse(), after));
         setAnchorId(progress?.lastReadId);
+        if (after.length < WINDOW) await checkEnd();
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
@@ -98,7 +105,7 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     return () => {
       cancelled = true;
     };
-  }, [repo, channel.id, channel.firstPostId, fillForward]);
+  }, [repo, channel.id, channel.firstPostId, fillForward, checkEnd]);
 
   const loadMore = useCallback(async () => {
     if (busyRef.current || atEnd || loading) return;
@@ -107,18 +114,17 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
       const lastId = posts.at(-1)?.id;
       const fromId = lastId === undefined ? (channel.firstPostId ?? 0) : lastId + 1;
       const batch = await fillForward(fromId, WINDOW);
-      if (batch.length === 0) {
-        const fresh = await repo.getChannel(channel.id);
-        if (fresh?.importState === "complete") setAtEnd(true);
-      } else {
-        setPosts((prev) => merge(prev, batch));
-      }
+      if (batch.length > 0) setPosts((prev) => merge(prev, batch));
+      // Неполное окно на докачанном канале означает конец. Проверять это надо
+      // сразу: иначе признак конца появится только после лишней прокрутки,
+      // которую читателю пришлось бы сделать вслепую.
+      if (batch.length < WINDOW) await checkEnd();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       busyRef.current = false;
     }
-  }, [atEnd, loading, posts, channel.firstPostId, channel.id, fillForward, repo]);
+  }, [atEnd, loading, posts, channel.firstPostId, fillForward, checkEnd]);
 
   const markRead = useCallback(
     (postId: number) => {

@@ -12,6 +12,8 @@ const UA =
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 5173,
+    strictPort: true,
     proxy: {
       "/tg": {
         target: TELEGRAM,

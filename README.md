@@ -96,6 +96,16 @@ npm test          # offline, deterministic, ~2.5 s
 npm run typecheck
 ```
 
+Browser tests. These cover what jsdom cannot: real scrolling, `IntersectionObserver`, and
+whether reading position survives a page reload. They need no network either, because Telegram
+requests are intercepted inside the browser and answered from the same saved fixtures, so the
+real parser runs against real Telegram markup:
+
+```bash
+npx playwright install chromium   # once
+npm run e2e
+```
+
 Live check against real Telegram (skipped by default, meant for a scheduled CI run so that
 broken markup is noticed before users notice it):
 
