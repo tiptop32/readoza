@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node / Readoza
+node_modules/
+dist/
+.vite/
+*.local
+.DS_Store
