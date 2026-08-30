@@ -91,6 +91,19 @@ describe("parseFeed: содержимое поста", () => {
     expect(photos[0]?.postUrl).toMatch(/^https:\/\/t\.me\//);
   });
 
+  it("забирает размеры картинок, чтобы место под них резервировалось заранее", () => {
+    // Одиночное фото: ширина в стиле обёртки, высота соотношением сторон внутри.
+    const single = parseFeed(media).posts.flatMap((p) => p.media).find((m) => m.kind === "photo");
+    expect(single?.width).toBeGreaterThan(0);
+    expect(single?.height).toBeGreaterThan(0);
+
+    // Фото в альбоме: обе величины проставлены в пикселях.
+    const album = parseFeed(start).posts.find((p) => p.albumIds.length > 1);
+    const inAlbum = album?.media.find((m) => m.kind === "photo");
+    expect(inAlbum?.width).toBeGreaterThan(0);
+    expect(inAlbum?.height).toBeGreaterThan(0);
+  });
+
   it("разбирает видео", () => {
     const videos = parseFeed(alias).posts.flatMap((p) => p.media).filter((m) => m.kind === "video");
     expect(videos.length).toBeGreaterThan(0);

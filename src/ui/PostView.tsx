@@ -4,9 +4,30 @@ import type { Media, Post } from "../core/model.js";
 import { formatDay } from "./format.js";
 import { sanitizePostHtml } from "./sanitize.js";
 
-function MediaView({ media }: { media: Media }): ReactElement | null {
+function MediaView({ media, onOpen }: { media: Media; onOpen?: () => void }): ReactElement | null {
   if (media.kind === "photo") {
-    return media.thumb ? <img className="post__photo" src={media.thumb} alt="" loading="lazy" /> : null;
+    if (!media.thumb) return null;
+    // width и height занимают место под картинку до загрузки: без них дозагрузка
+    // сдвигает уже прочитанный текст и утаскивает восстановленную позицию.
+    const image = (
+      <img
+        className="post__photo"
+        src={media.thumb}
+        alt=""
+        loading="lazy"
+        width={media.width}
+        height={media.height}
+      />
+    );
+    // В колонке шириной с текст, а в альбоме ещё и вдвое уже, разглядеть
+    // что-либо невозможно, поэтому фото открывается во весь экран.
+    return onOpen ? (
+      <button type="button" className="post__photo-button" onClick={onOpen} aria-label="Open photo">
+        {image}
+      </button>
+    ) : (
+      image
+    );
   }
   if (media.kind === "video") {
     return (
@@ -17,6 +38,8 @@ function MediaView({ media }: { media: Media }): ReactElement | null {
         controls
         preload="none"
         playsInline
+        width={media.width}
+        height={media.height}
       />
     );
   }
@@ -28,10 +51,25 @@ function MediaView({ media }: { media: Media }): ReactElement | null {
   );
 }
 
-export function PostView({ post, read }: { post: Post; read: boolean }): ReactElement {
+export function PostView({
+  post,
+  read,
+  onOpenImage,
+}: {
+  post: Post;
+  read: boolean;
+  /** Индекс среди фотографий поста, а не среди всего медиа. */
+  onOpenImage?: (photoIndex: number) => void;
+}): ReactElement {
   // Разметка приходит с чужого сайта, рендерить её без санитизации нельзя.
   const html = useMemo(() => sanitizePostHtml(post.html), [post.html]);
   const album = post.albumIds.length > 1;
+
+  // Видео и документы в счёт не идут: листается только альбом из фотографий.
+  const photoIndexes = useMemo(() => {
+    let seen = -1;
+    return post.media.map((media) => (media.kind === "photo" ? (seen += 1) : -1));
+  }, [post.media]);
 
   return (
     <article
@@ -53,9 +91,18 @@ export function PostView({ post, read }: { post: Post; read: boolean }): ReactEl
 
       {post.media.length > 0 ? (
         <div className={`post__media${album ? " post__media--album" : ""}`}>
-          {post.media.map((media, index) => (
-            <MediaView key={`${media.kind}-${media.url ?? media.thumb ?? index}`} media={media} />
-          ))}
+          {post.media.map((media, index) => {
+            const photoIndex = photoIndexes[index] ?? -1;
+            const open =
+              onOpenImage && photoIndex >= 0 ? () => onOpenImage(photoIndex) : undefined;
+            return (
+              <MediaView
+                key={`${media.kind}-${media.url ?? media.thumb ?? index}`}
+                media={media}
+                {...(open ? { onOpen: open } : {})}
+              />
+            );
+          })}
         </div>
       ) : null}
 

@@ -56,6 +56,34 @@ function attrUrl(el: Element | null | undefined, name: string): string | undefin
   return safeUrl(el?.getAttribute(name));
 }
 
+function stylePx(style: string, property: string): number | undefined {
+  const m = new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([\\d.]+)px`).exec(style);
+  return m?.[1] ? Math.round(Number.parseFloat(m[1])) : undefined;
+}
+
+/**
+ * Размеры картинки из разметки.
+ *
+ * У фотографии в альбоме ширина и высота проставлены в пикселях. У одиночной
+ * задана только ширина, а высота — соотношением сторон через padding-top
+ * вложенного блока. Без этих чисел браузер не знает, сколько места занять,
+ * и дозагрузка картинок сдвигает уже отрисованный текст.
+ */
+function mediaSize(wrap: Element | null | undefined): { width?: number; height?: number } {
+  const style = wrap?.getAttribute("style") ?? "";
+  const width = stylePx(style, "width");
+  const height = stylePx(style, "height");
+  if (width !== undefined && height !== undefined) return { width, height };
+  if (width === undefined) return {};
+
+  const ratioStyle =
+    wrap?.querySelector(".tgme_widget_message_photo")?.getAttribute("style") ?? "";
+  const ratio = /padding-top\s*:\s*([\d.]+)%/.exec(ratioStyle);
+  return ratio?.[1]
+    ? { width, height: Math.round((width * Number.parseFloat(ratio[1])) / 100) }
+    : { width };
+}
+
 function bgUrl(el: Element | null | undefined): string | undefined {
   const style = el?.getAttribute("style");
   const m = style ? BG_URL.exec(style) : null;
@@ -92,6 +120,7 @@ function parseMedia(root: Element): Media[] {
       kind: "photo",
       thumb: bgUrl(el),
       postUrl: attrUrl(el, "href"),
+      ...mediaSize(el),
     });
   }
 
@@ -104,6 +133,7 @@ function parseMedia(root: Element): Media[] {
       url: attrUrl(video, "src"),
       thumb: bgUrl(el.querySelector(".tgme_widget_message_video_thumb")),
       postUrl: attrUrl(player, "href"),
+      ...mediaSize(player),
     });
   }
 

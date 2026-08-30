@@ -9,8 +9,16 @@ const fixture = (name: string): string => readFileSync(FIXTURES + name, "utf8");
  * Telegram подменяется внутри браузера сохранёнными страницами. Это не мок
  * парсера: приложение работает с настоящим HTML Telegram, просто без сети.
  */
+/**
+ * Медиа с CDN Telegram подменяется настоящим PNG, а не блокируется: у картинки
+ * нулевого размера схлопывается обёртка, и кликнуть по ней нельзя.
+ */
+const IMAGE = fileURLToPath(new URL("../public/icon-192.png", import.meta.url));
+
 async function stubTelegram(page: Page): Promise<void> {
-  await page.route(/telesco\.pe|telegram\.org/, (route) => route.abort());
+  await page.route(/telesco\.pe|telegram\.org/, (route) =>
+    route.fulfill({ path: IMAGE, contentType: "image/png" }),
+  );
   await page.route("**/tg/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/tg/, "");
@@ -103,6 +111,24 @@ test("без сети остаётся читаемым и честно об э�
   await expect(
     page.getByText("You are offline. Everything already downloaded is still readable."),
   ).toBeHidden();
+});
+
+test("открывает картинку во весь экран", async ({ page }) => {
+  await stubTelegram(page);
+  await addChannel(page);
+
+  const photo = page.getByRole("button", { name: "Open photo" }).first();
+  await photo.scrollIntoViewIfNeeded();
+  await photo.click();
+
+  const overlay = page.getByRole("dialog");
+  await expect(overlay).toBeVisible();
+  // Картинка занимает экран, а не колонку шириной с текст.
+  const box = await overlay.locator(".lightbox__image").boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan(0);
+
+  await page.keyboard.press("Escape");
+  await expect(overlay).toBeHidden();
 });
 
 test("после возврата даёт листать назад к прочитанному", async ({ page }) => {

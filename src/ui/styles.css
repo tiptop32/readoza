@@ -332,11 +332,6 @@ button:disabled {
 .post {
   padding: 20px 0 28px;
   border-bottom: 1px solid var(--line);
-  /* Лента растёт по мере чтения и за длинную сессию набирает сотни постов.
-     Браузер пропускает отрисовку тех, что вне экрана, а contain-intrinsic-size
-     удерживает высоту, чтобы полоса прокрутки не прыгала. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 320px;
 }
 
 .post--service {
@@ -377,6 +372,16 @@ button:disabled {
 
 .post__media--album {
   grid-template-columns: repeat(2, 1fr);
+}
+
+.post__photo-button {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: zoom-in;
 }
 
 .post__photo,
@@ -430,6 +435,81 @@ button:disabled {
 
 .post__link-preview-body span {
   color: var(--muted);
+}
+
+/* ---------- фото во весь экран ---------- */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px 64px;
+  background: rgba(0, 0, 0, 0.92);
+  cursor: zoom-out;
+}
+
+.lightbox__image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: default;
+}
+
+.lightbox__close,
+.lightbox__nav {
+  position: absolute;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  line-height: 1;
+  border-radius: 50%;
+}
+
+.lightbox__close {
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  font-size: 24px;
+}
+
+.lightbox__nav {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  font-size: 28px;
+}
+
+.lightbox__nav--prev {
+  left: 12px;
+}
+
+.lightbox__nav--next {
+  right: 12px;
+}
+
+.lightbox__close:hover,
+.lightbox__nav:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.lightbox__footer {
+  position: absolute;
+  bottom: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  cursor: default;
+}
+
+.lightbox__footer a {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* Эмодзи Telegram: картинку из style мы вырезаем при санитизации,

@@ -4,6 +4,7 @@ import { percentByIds } from "../core/reader/progress.js";
 import type { Source } from "../core/source/types.js";
 import type { Channel, Repo } from "../core/storage/types.js";
 import { formatMonth, formatPercent } from "./format.js";
+import { Lightbox } from "./Lightbox.js";
 import { PostView } from "./PostView.js";
 import { useOnline } from "./useOnline.js";
 import { useReader } from "./useReader.js";
@@ -31,6 +32,7 @@ export function Reader({
   const reader = useReader(repo, source, channel);
   const online = useOnline();
   const [currentId, setCurrentId] = useState<number | undefined>(reader.anchorId);
+  const [lightbox, setLightbox] = useState<{ postId: number; index: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
@@ -128,6 +130,12 @@ export function Reader({
       : 0;
   const currentDate = reader.posts.find((post) => post.id === currentId)?.date;
 
+  const lightboxPhotos = lightbox
+    ? (reader.posts
+        .find((post) => post.id === lightbox.postId)
+        ?.media.filter((media) => media.kind === "photo") ?? [])
+    : [];
+
   return (
     <div className="reader">
       <header className="reader__bar">
@@ -167,6 +175,7 @@ export function Reader({
             key={post.id}
             post={post}
             read={currentId !== undefined && post.id <= currentId}
+            onOpenImage={(index) => setLightbox({ postId: post.id, index })}
           />
         ))}
       </div>
@@ -181,6 +190,14 @@ export function Reader({
               : null}
       </div>
 
+      {lightbox && lightboxPhotos.length > 0 ? (
+        <Lightbox
+          photos={lightboxPhotos}
+          index={lightbox.index}
+          onIndex={(index) => setLightbox({ postId: lightbox.postId, index })}
+          onClose={() => setLightbox(null)}
+        />
+      ) : null}
     </div>
   );
 }
