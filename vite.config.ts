@@ -41,8 +41,12 @@ export default defineConfig({
     }),
   ],
   server: {
+    // Слушаем все интерфейсы, иначе с телефона в той же сети не открыть.
+    host: true,
     port: 5173,
     strictPort: true,
+    // Обращение по mDNS-имени вида macbook.local Vite иначе отклоняет.
+    allowedHosts: [".local"],
     proxy: {
       "/tg": {
         target: TELEGRAM,
@@ -51,6 +55,12 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/tg/, ""),
       },
     },
+  },
+  // Тот же доступ для проверки собранной версии, включая service worker.
+  preview: {
+    host: true,
+    port: 4173,
+    allowedHosts: [".local"],
   },
   test: {
     environment: "jsdom",
