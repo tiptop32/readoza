@@ -42,6 +42,11 @@ A channel can be exported to EPUB and read in Kindle, Apple Books or anything el
 "like a book" promise taken literally, and it is also the only part of Readoza that outlives the
 source: the file works offline forever and would survive `t.me/s` disappearing entirely.
 
+The book covers the whole channel, not the part that happens to have been read. Reading pulls
+pages lazily, only as far as you got, so exporting an unfinished channel downloads the rest
+first and says so while it does. If Telegram cuts the feed short before the end, the file is
+still produced, with a plain statement that it is incomplete.
+
 Chapters are split by month, because fifteen hundred posts in one flow is not a book. Every post
 links back to the original message in Telegram. Service messages are left out. Media is not
 embedded, only linked: Readoza stores post text locally but never the image and video bytes, and

@@ -98,7 +98,13 @@ export function ChannelEntry({
           onClick={() => void actions.exportEpub()}
           disabled={actions.exporting}
         >
-          {actions.exporting ? "Building the book…" : "Export as EPUB"}
+          {actions.stage === "downloading"
+            ? `Downloading the channel… ${formatCount(actions.downloaded)} posts`
+            : actions.stage === "building"
+              ? "Building the book…"
+              : complete && actions.storedCount !== undefined
+                ? `Export ${formatCount(actions.storedCount)} posts as EPUB`
+                : "Export whole channel as EPUB"}
         </button>
       </div>
 
@@ -109,8 +115,28 @@ export function ChannelEntry({
         </p>
       ) : null}
       {complete ? null : (
-        <p className="entry__warning">The book will contain only what is downloaded so far.</p>
+        <p className="entry__warning">
+          {actions.storedCount === undefined
+            ? "Exporting downloads the rest of the channel first."
+            : `${formatCount(actions.storedCount)} posts downloaded so far. Exporting fetches the rest of the channel before building the book.`}
+        </p>
       )}
+      {/* Докачка может закончиться не только успехом, и молчать об этом нельзя:
+          снаружи неполный канал выглядит точно так же, как полный. */}
+      {actions.lastRun && !actions.lastRun.done ? (
+        <p className="entry__warning">
+          {actions.lastRun.stalled
+            ? `Telegram stopped returning older posts after ${formatCount(actions.lastRun.posts)} of them. The channel is not fully downloaded; try again later.`
+            : `Download paused after ${formatCount(actions.lastRun.posts)} posts. Press again to continue where it stopped.`}
+        </p>
+      ) : null}
+
+      {actions.exported ? (
+        <p className="entry__warning">
+          Saved {formatCount(actions.exported.posts)} posts in{" "}
+          {formatCount(actions.exported.chapters)} chapters.
+        </p>
+      ) : null}
       {actions.error ? <p className="notice notice--error">{actions.error}</p> : null}
     </li>
   );

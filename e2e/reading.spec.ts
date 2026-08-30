@@ -204,14 +204,39 @@ test("после возврата даёт листать назад к проч
   await expect(page.locator("#post-1")).toBeAttached();
 });
 
+test("докачивает канал, даже если уйти читать во время скачивания", async ({ page }) => {
+  await stubTelegram(page);
+  await addChannel(page);
+  await page.getByRole("button", { name: "Back" }).click();
+
+  await page.getByRole("button", { name: /Download for offline/i }).click();
+  // Уходим читать прямо во время докачки: список размонтируется.
+  await page.getByRole("button", { name: /^Системный Аналитик/ }).click();
+  await expect(page.locator("[data-post-id]").first()).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+
+  // Докачка не должна была оборваться от ухода со списка: у докачанного канала
+  // кнопка скачивания исчезает, а на кнопке экспорта появляется число постов.
+  await expect(page.getByRole("button", { name: /Download for offline/i })).toBeHidden({
+    timeout: 30_000,
+  });
+  await expect(page.getByRole("button", { name: /as EPUB/i })).toHaveText(
+    /Export [\d,]+ posts as EPUB/,
+  );
+});
+
 test("отдаёт канал книгой в формате EPUB с карточки на главной", async ({ page }) => {
   await stubTelegram(page);
   await addChannel(page);
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("heading", { name: "Readoza" })).toBeVisible();
 
+  // Книга обещана по всему каналу, поэтому экспорт сначала дотягивает остаток.
+  const exportButton = page.getByRole("button", { name: /as EPUB/i });
+  await expect(exportButton).toHaveText("Export whole channel as EPUB");
+
   const downloading = page.waitForEvent("download");
-  await page.getByRole("button", { name: /export as epub/i }).click();
+  await exportButton.click();
   const download = await downloading;
 
   expect(download.suggestedFilename()).toBe("readoza-sys_sa.epub");
@@ -220,6 +245,11 @@ test("отдаёт канал книгой в формате EPUB с карто�
   // mimetype обязан лежать первой записью архива, иначе это не EPUB.
   expect(bytes.subarray(30, 38).toString("utf8")).toBe("mimetype");
   expect(bytes.byteLength).toBeGreaterThan(1000);
+
+  // И отчитывается о том, что реально оказалось в файле.
+  await expect(page.getByText(/Saved [\d,]+ posts in [\d,]+ chapters/)).toBeVisible();
+  // Канал докачан целиком, а не только до прочитанного места.
+  await expect(page.getByRole("button", { name: /Download for offline/i })).toBeHidden();
 });
 
 test("дочитывает канал до конца и подгружает новые окна", async ({ page }) => {
