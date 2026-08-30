@@ -19,6 +19,8 @@ export interface ReaderApi {
   /** Позиция, на которую нужно проскроллить после первой загрузки. */
   anchorId?: number;
   loadMore: () => Promise<void>;
+  /** Повторить последнюю неудавшуюся подгрузку после сбоя сети. */
+  retry: () => Promise<void>;
   markRead: (postId: number) => void;
   downloadAll: () => Promise<void>;
   downloading: boolean;
@@ -126,6 +128,11 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     }
   }, [atEnd, loading, posts, channel.firstPostId, fillForward, checkEnd]);
 
+  const retry = useCallback(async () => {
+    setError(undefined);
+    await loadMore();
+  }, [loadMore]);
+
   const markRead = useCallback(
     (postId: number) => {
       const next = advanceRead(progressRef.current, channel.id, postId);
@@ -154,6 +161,7 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     loading,
     atEnd,
     loadMore,
+    retry,
     markRead,
     downloadAll,
     downloading,

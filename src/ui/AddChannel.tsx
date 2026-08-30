@@ -5,6 +5,7 @@ import { addChannel, ReadozaError } from "../core/reader/library.js";
 import type { Source } from "../core/source/types.js";
 import type { Channel, Repo } from "../core/storage/types.js";
 import { formatCount } from "./format.js";
+import { useOnline } from "./useOnline.js";
 
 /** Пауза перед резолвом, чтобы не дёргать Telegram на каждую букву. */
 const RESOLVE_DEBOUNCE_MS = 400;
@@ -33,6 +34,7 @@ export function AddChannel({
   const [state, setState] = useState<State>("idle");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const online = useOnline();
 
   useEffect(() => {
     setError(undefined);
@@ -96,9 +98,21 @@ export function AddChannel({
         aria-label="Telegram channel"
       />
 
+      {online ? null : (
+        <p className="notice notice--offline">
+          You are offline. Adding a new channel needs a connection; channels you already have stay
+          readable.
+        </p>
+      )}
+
       {state === "resolving" ? <p className="add__hint">Looking up…</p> : null}
-      {state === "missing" ? <p className="add__hint">No such channel.</p> : null}
-      {state === "failed" ? <p className="add__hint">Could not reach Telegram.</p> : null}
+      {state === "missing" ? (
+        <p className="add__hint">
+          No such channel. Readoza reads public channels; private ones and invite links are not
+          supported.
+        </p>
+      ) : null}
+      {state === "failed" ? <p className="add__hint">Could not reach Telegram. Try again.</p> : null}
 
       {meta ? (
         <div className="card">
@@ -111,7 +125,7 @@ export function AddChannel({
             </span>
             {meta.description ? <p className="card__description">{meta.description}</p> : null}
           </div>
-          <button type="button" onClick={() => void start()} disabled={adding}>
+          <button type="button" onClick={() => void start()} disabled={adding || !online}>
             {adding ? "Finding the first post…" : "Start from the beginning"}
           </button>
         </div>

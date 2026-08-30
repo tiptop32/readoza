@@ -1,3 +1,4 @@
+import { TransportError } from "../../core/source/errors.js";
 import type { Transport } from "../../core/source/types.js";
 
 /**
@@ -23,9 +24,15 @@ export function proxyUrl(url: string, base: string = PROXY_BASE): string {
 
 export function createWebTransport(base: string = PROXY_BASE): Transport {
   return async (url) => {
-    const response = await fetch(proxyUrl(url, base), { headers: { Accept: "text/html" } });
+    let response: Response;
+    try {
+      response = await fetch(proxyUrl(url, base), { headers: { Accept: "text/html" } });
+    } catch (cause) {
+      // До сервера не дошли: нет сети, режется прокси, оборвалось соединение.
+      throw new TransportError(`${url} -> сеть недоступна`, undefined, cause);
+    }
     if (!response.ok) {
-      throw new Error(`${url} -> HTTP ${response.status}`);
+      throw new TransportError(`${url} -> HTTP ${response.status}`, response.status);
     }
     return response.text();
   };

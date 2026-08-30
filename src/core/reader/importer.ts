@@ -1,6 +1,7 @@
 import type { Cursor, Page } from "../model.js";
 import type { Source } from "../source/types.js";
 import type { Channel, Repo } from "../storage/types.js";
+import { type RetryOptions, withRetry } from "./retry.js";
 
 /**
  * Фоновая докачка канала.
@@ -85,6 +86,7 @@ export async function importNextPage(
   repo: Repo,
   source: Source,
   channelId: string,
+  retry: RetryOptions = {},
 ): Promise<ImportStep> {
   const stored = await repo.getChannel(channelId);
   if (!stored) throw new Error(`канал не найден в хранилище: ${channelId}`);
@@ -95,7 +97,8 @@ export async function importNextPage(
   }
 
   const cursor: Cursor = stored.importCursor ?? { kind: "start" };
-  const page = await source.fetchPage(stored.username, cursor);
+  // Один 429 или моргнувшая сеть не должны ронять докачку, которая идёт минуты.
+  const page = await withRetry(() => source.fetchPage(stored.username, cursor), retry);
 
   let channel = stored;
   if (page.posts.length > 0) {
@@ -155,7 +158,7 @@ export async function importChannel(
       break;
     }
 
-    const step = await importNextPage(repo, source, channelId);
+    const step = await importNextPage(repo, source, channelId, { ...(signal ? { signal } : {}), sleep });
     result.pages += 1;
     result.posts += step.posts;
     if (step.lastId !== undefined) result.lastId = step.lastId;

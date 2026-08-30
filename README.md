@@ -36,6 +36,18 @@ Verified behaviour this design relies on (probed against live Telegram, 2026-08-
 | Aliases | `t.me/s/breakingmash` serves `data-post="mash/…"`, so the canonical name comes from `data-post` |
 | CORS | t.me sends no `Access-Control-Allow-Origin`, so the browser build needs a thin proxy. Media CDN does send `*` |
 
+## Offline and flaky networks
+
+Readoza is installable and its shell is cached by a service worker, so it opens with no
+connection at all. Everything already downloaded stays readable, and the reader says so instead
+of pretending the channel ended. Adding a new channel is the only thing that needs a network.
+
+Telegram promises nothing about `t.me/s`: no documented rate limits, no stability. A single 429
+or a dropped connection must not kill a crawl that has been running for minutes and already made
+progress, so requests are retried with a widening pause (1s, 2s, 4s). Only failures worth
+retrying are retried: a network error, a 429 or a 5xx. A 404 fails immediately, because
+repeating it would just be noise.
+
 ## Caveats you should know
 
 `t.me/s` is not a documented or stable API. Telegram can change the markup, rate-limit, or
@@ -84,6 +96,7 @@ src/
       importer.ts             resumable crawl, one page at a time
       progress.ts             reading position and percentages
       library.ts              add a channel, resolve it, find its beginning
+    reader/retry.ts           widening backoff for the failures worth retrying
   platform/web/transport.ts   the proxy-aware fetch. Swapped per platform
   ui/                         React reader: omnibox, channel list, continuous scroll
 ```

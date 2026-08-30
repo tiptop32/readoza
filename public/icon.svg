@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Readoza">
+  <rect width="512" height="512" rx="112" fill="#1c1b19" />
+  <!-- Лента как стопка строк: верхняя прочитана и подсвечена, ниже уходит в непрочитанное. -->
+  <rect x="112" y="152" width="288" height="34" rx="17" fill="#5b9bd5" />
+  <rect x="112" y="230" width="288" height="34" rx="17" fill="#fdfcfa" opacity="0.9" />
+  <rect x="112" y="308" width="196" height="34" rx="17" fill="#fdfcfa" opacity="0.5" />
+</svg>

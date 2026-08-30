@@ -3,8 +3,9 @@ import type { ReactElement } from "react";
 import { percentByIds } from "../core/reader/progress.js";
 import type { Source } from "../core/source/types.js";
 import type { Channel, Repo } from "../core/storage/types.js";
-import { formatMonth, formatPercent } from "./format.js";
+import { formatCount, formatMonth, formatPercent } from "./format.js";
 import { PostView } from "./PostView.js";
+import { useOnline } from "./useOnline.js";
 import { useReader } from "./useReader.js";
 
 /**
@@ -15,6 +16,14 @@ import { useReader } from "./useReader.js";
 const POSITION_BAND = "-33% 0px -66% 0px";
 /** Позиция пишется не на каждый пиксель прокрутки. */
 const SAVE_DEBOUNCE_MS = 600;
+/** Замер на живом Telegram: одна страница ленты это около 20 постов. */
+const POSTS_PER_REQUEST = 20;
+/**
+ * С какого размера канал считается большим. Порог по диапазону id, а не по числу
+ * постов: точного числа постов Telegram не отдаёт, а полная докачка новостного
+ * канала это тысячи запросов и почти гарантированная блокировка по IP.
+ */
+const HUGE_CHANNEL_SPAN = 20_000;
 
 export function Reader({
   repo,
@@ -28,6 +37,7 @@ export function Reader({
   onExit: () => void;
 }): ReactElement {
   const reader = useReader(repo, source, channel);
+  const online = useOnline();
   const [currentId, setCurrentId] = useState<number | undefined>(reader.anchorId);
   const listRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -88,6 +98,13 @@ export function Reader({
       : 0;
   const currentDate = reader.posts.find((post) => post.id === currentId)?.date;
 
+  // Оценка сверху: диапазон id больше числа постов ровно на удалённые.
+  const estimatedPosts =
+    channel.firstPostId !== undefined && channel.lastPostId !== undefined
+      ? channel.lastPostId - channel.firstPostId
+      : 0;
+  const huge = estimatedPosts > HUGE_CHANNEL_SPAN;
+
   return (
     <div className="reader">
       <header className="reader__bar">
@@ -102,7 +119,20 @@ export function Reader({
         <div className="reader__progress" style={{ width: `${percent}%` }} />
       </header>
 
-      {reader.error ? <p className="notice notice--error">{reader.error}</p> : null}
+      {online ? null : (
+        <p className="notice notice--offline">
+          You are offline. Everything already downloaded is still readable.
+        </p>
+      )}
+
+      {reader.error ? (
+        <p className="notice notice--error" title={reader.error}>
+          Could not reach Telegram.{" "}
+          <button type="button" className="notice__action" onClick={() => void reader.retry()}>
+            Try again
+          </button>
+        </p>
+      ) : null}
 
       <div className="reader__posts" ref={listRef}>
         {reader.posts.map((post) => (
@@ -115,17 +145,33 @@ export function Reader({
       </div>
 
       <div ref={sentinelRef} className="reader__sentinel">
-        {reader.loading ? "Loading…" : null}
-        {reader.atEnd ? "You have reached the end of the channel." : null}
+        {reader.atEnd
+          ? "You have reached the end of the channel."
+          : !online
+            ? "More posts will load when you are back online."
+            : reader.loading
+              ? "Loading…"
+              : null}
       </div>
 
       {channel.importState !== "complete" ? (
         <footer className="reader__footer">
-          <button type="button" onClick={() => void reader.downloadAll()} disabled={reader.downloading}>
+          <button
+            type="button"
+            onClick={() => void reader.downloadAll()}
+            disabled={reader.downloading || !online}
+          >
             {reader.downloading
               ? `Downloading… ${reader.downloaded} posts`
               : "Download whole channel for offline"}
           </button>
+          {huge ? (
+            <p className="reader__warning">
+              This channel is large. A full download is roughly{" "}
+              {formatCount(Math.ceil(estimatedPosts / POSTS_PER_REQUEST))} requests to Telegram and
+              can take a while.
+            </p>
+          ) : null}
         </footer>
       ) : null}
     </div>

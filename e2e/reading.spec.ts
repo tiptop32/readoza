@@ -83,6 +83,28 @@ test("запоминает позицию при прокрутке и возв�
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
 });
 
+test("без сети остаётся читаемым и честно об этом говорит", async ({ page, context }) => {
+  await stubTelegram(page);
+  await addChannel(page);
+  const visible = await page.locator("[data-post-id]").count();
+
+  await context.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+
+  await expect(
+    page.getByText("You are offline. Everything already downloaded is still readable."),
+  ).toBeVisible();
+  // Скачанное никуда не делось: это и есть смысл local-first.
+  expect(await page.locator("[data-post-id]").count()).toBe(visible);
+  await expect(page.locator("#post-1")).toBeVisible();
+
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(
+    page.getByText("You are offline. Everything already downloaded is still readable."),
+  ).toBeHidden();
+});
+
 test("дочитывает канал до конца и подгружает новые окна", async ({ page }) => {
   await stubTelegram(page);
   await addChannel(page);

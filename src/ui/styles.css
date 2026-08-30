@@ -127,9 +127,34 @@ button:disabled {
   font-size: 15px;
 }
 
+.notice {
+  max-width: var(--measure);
+  margin: 12px auto;
+  padding: 10px 14px;
+  font-size: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
 .notice--error {
   color: #b23c2c;
-  font-size: 15px;
+  border-color: #e0b4ac;
+}
+
+.notice--offline {
+  color: var(--muted);
+}
+
+.notice__action {
+  padding: 2px 10px;
+  font-size: 14px;
+}
+
+.reader__warning {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--muted);
 }
 
 /* ---------- список каналов ---------- */
