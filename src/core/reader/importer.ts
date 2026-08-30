@@ -27,6 +27,8 @@ export interface ImportProgress {
   done: boolean;
   /** Остановлено извне: докачку можно продолжить позже с того же курсора. */
   aborted: boolean;
+  /** Лента оборвалась раньше известного конца: канал остался недокачанным. */
+  stalled: boolean;
 }
 
 export interface ImportOptions {
@@ -73,8 +75,15 @@ export interface ImportStep {
   /** Сколько постов пришло на этой странице. */
   posts: number;
   lastId?: number;
-  /** Канал дочитан до конца. */
+  /** Канал дочитан до конца, и это подтверждено последним известным id. */
   done: boolean;
+  /**
+   * Курсора вперёд нет, но конец не подтверждён. Скорее всего изменилась
+   * разметка Telegram. Канал остаётся недокачанным, чтобы не потерять остаток.
+   */
+  stalled: boolean;
+  /** Канал исчез, пока шёл запрос: его удалили. Ничего не записано. */
+  cancelled: boolean;
 }
 
 /**
@@ -91,35 +100,63 @@ export async function importNextPage(
   const stored = await repo.getChannel(channelId);
   if (!stored) throw new Error(`канал не найден в хранилище: ${channelId}`);
   if (stored.importState === "complete") {
-    const step: ImportStep = { posts: 0, done: true };
+    const step: ImportStep = { posts: 0, done: true, stalled: false, cancelled: false };
     if (stored.lastPostId !== undefined) step.lastId = stored.lastPostId;
     return step;
   }
 
   const cursor: Cursor = stored.importCursor ?? { kind: "start" };
+  const knownLastId = stored.lastPostId;
   // Один 429 или моргнувшая сеть не должны ронять докачку, которая идёт минуты.
   const page = await withRetry(() => source.fetchPage(stored.username, cursor), retry);
 
-  let channel = stored;
+  // Пока шёл запрос, канал могли удалить. Записывать сюда устаревший объект
+  // нельзя: удалённый канал воскрес бы вместе с частью постов, но без прогресса.
+  const current = await repo.getChannel(channelId);
+  if (!current) return { posts: 0, done: false, stalled: false, cancelled: true };
+
+  let channel = current;
   if (page.posts.length > 0) {
     await repo.putPosts(channelId, page.posts);
     channel = widenBounds(channel, page);
   }
 
-  // Конец канала: Telegram не отдал курсор вперёд.
-  // Тот же курсор второй раз означает, что лента не двигается, и это тоже конец.
-  const done = !page.next || sameCursor(page.next, cursor);
+  const fetchedLastId = page.posts.at(-1)?.id;
+  // Telegram не отдал курсор вперёд, либо отдал тот же самый: лента не двигается.
+  const noCursor = !page.next || sameCursor(page.next, cursor);
+  /*
+   * Само по себе отсутствие курсора концом канала не считается. Последний
+   * известный id мы узнали при добавлении канала, и пока до него не дошли,
+   * пропавший курсор куда вероятнее означает изменившуюся разметку, чем конец.
+   * Пометить канал докачанным в этот момент значило бы тихо потерять остаток
+   * истории: интерфейс спрятал бы докачку, а книга вышла бы обрезанной.
+   */
+  const reachedKnownEnd =
+    knownLastId === undefined || (fetchedLastId !== undefined && fetchedLastId >= knownLastId);
+  const done = noCursor && reachedKnownEnd;
+  const stalled = noCursor && !reachedKnownEnd;
+
   if (done) {
     const { importCursor: _drop, ...rest } = channel;
     channel = { ...rest, importState: "complete", postCount: await repo.countPosts(channelId) };
   } else {
-    channel = { ...channel, importState: "partial", importCursor: page.next };
+    // При заминке двигаем курсор на последний полученный пост: повтор продолжит
+    // с этого места, если разметка починится, и не будет топтаться на месте.
+    const nextCursor: Cursor | undefined = noCursor
+      ? fetchedLastId === undefined
+        ? channel.importCursor
+        : { kind: "after", id: fetchedLastId }
+      : page.next;
+    channel = {
+      ...channel,
+      importState: "partial",
+      ...(nextCursor ? { importCursor: nextCursor } : {}),
+    };
   }
   await repo.putChannel(channel);
 
-  const step: ImportStep = { posts: page.posts.length, done };
-  const lastId = page.posts.at(-1)?.id;
-  if (lastId !== undefined) step.lastId = lastId;
+  const step: ImportStep = { posts: page.posts.length, done, stalled, cancelled: false };
+  if (fetchedLastId !== undefined) step.lastId = fetchedLastId;
   return step;
 }
 
@@ -144,7 +181,14 @@ export async function importChannel(
   const stored = await repo.getChannel(channelId);
   if (!stored) throw new Error(`канал не найден в хранилище: ${channelId}`);
 
-  const result: ImportProgress = { channelId, pages: 0, posts: 0, done: false, aborted: false };
+  const result: ImportProgress = {
+    channelId,
+    pages: 0,
+    posts: 0,
+    done: false,
+    aborted: false,
+    stalled: false,
+  };
   if (stored.importState === "complete") {
     result.done = true;
     if (stored.lastPostId !== undefined) result.lastId = stored.lastPostId;
@@ -163,8 +207,17 @@ export async function importChannel(
     result.posts += step.posts;
     if (step.lastId !== undefined) result.lastId = step.lastId;
 
+    if (step.cancelled) {
+      // Канал удалили во время докачки: продолжать нечего.
+      result.aborted = true;
+      break;
+    }
     if (step.done) {
       result.done = true;
+      break;
+    }
+    if (step.stalled) {
+      result.stalled = true;
       break;
     }
 

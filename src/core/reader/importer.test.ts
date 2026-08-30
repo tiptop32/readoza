@@ -2,8 +2,9 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createIdbRepo } from "../storage/idb.js";
 import { channelId, newChannel, type Repo } from "../storage/types.js";
+import type { Source } from "../source/types.js";
 import { importChannel, type ImportProgress } from "./importer.js";
-import { makeFakeSource } from "./testSource.js";
+import { fakePost, makeFakeSource } from "./testSource.js";
 
 const CHANNEL = channelId("fake", "sys_sa");
 // 23 поста с пропусками: удалённые id не должны ломать обход
@@ -106,6 +107,71 @@ describe("importChannel", () => {
     });
     expect(seen.length).toBeGreaterThan(1);
     expect(seen.at(-1)).toBe(IDS.length);
+  });
+
+  it("не помечает канал докачанным, если лента оборвалась раньше известного конца", async () => {
+    // Канал знает, что последний пост 999, но лента отдаёт три поста и молчит
+    // про курсор. Это скорее сломанная разметка Telegram, чем конец истории.
+    const channel = await repo.getChannel(CHANNEL);
+    await repo.putChannel({ ...channel!, lastPostId: 999 });
+
+    const truncated: Source = {
+      id: "fake",
+      match: (input) => input,
+      fetchMeta: async () => ({ username: "sys_sa", title: "Канал" }),
+      fetchPage: async () => ({
+        channel: "sys_sa",
+        posts: [1, 2, 3].map((id) => fakePost("sys_sa", id)),
+      }),
+    };
+
+    const result = await importChannel(repo, truncated, CHANNEL, { sleep: noSleep });
+    expect(result.stalled).toBe(true);
+    expect(result.done).toBe(false);
+
+    const after = await repo.getChannel(CHANNEL);
+    expect(after?.importState).toBe("partial");
+    // Знаменатель не выставлен: иначе книга и счётчик врали бы о полноте.
+    expect(after?.postCount).toBeUndefined();
+    // Курсор сдвинут на последний полученный пост: повтор продолжит отсюда.
+    expect(after?.importCursor).toEqual({ kind: "after", id: 3 });
+  });
+
+  it("считает концом обрыв ленты, когда дошли до последнего известного поста", async () => {
+    const channel = await repo.getChannel(CHANNEL);
+    await repo.putChannel({ ...channel!, lastPostId: 3 });
+
+    const source: Source = {
+      id: "fake",
+      match: (input) => input,
+      fetchMeta: async () => ({ username: "sys_sa", title: "Канал" }),
+      fetchPage: async () => ({
+        channel: "sys_sa",
+        posts: [1, 2, 3].map((id) => fakePost("sys_sa", id)),
+      }),
+    };
+
+    const result = await importChannel(repo, source, CHANNEL, { sleep: noSleep });
+    expect(result.done).toBe(true);
+    expect(result.stalled).toBe(false);
+    expect((await repo.getChannel(CHANNEL))?.importState).toBe("complete");
+  });
+
+  it("не воскрешает канал, удалённый во время докачки", async () => {
+    const inner = makeFakeSource("sys_sa", IDS);
+    const racing: Source = {
+      ...inner,
+      fetchPage: async (channelName, cursor) => {
+        // Пользователь удалил канал, пока шёл запрос.
+        await repo.removeChannel(CHANNEL);
+        return inner.fetchPage(channelName, cursor);
+      },
+    };
+
+    const result = await importChannel(repo, racing, CHANNEL, { sleep: noSleep });
+    expect(result.aborted).toBe(true);
+    expect(await repo.getChannel(CHANNEL)).toBeUndefined();
+    expect(await repo.countPosts(CHANNEL)).toBe(0);
   });
 
   it("падает на неизвестном канале", async () => {

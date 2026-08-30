@@ -31,6 +31,9 @@ describe("addChannel", () => {
 
     // Один запрос за последней страницей, один за первой.
     expect(calls.map((c) => c.kind)).toEqual(["end", "start"]);
+    // Поиску начала передана уже известная верхняя граница id: без неё канал с
+    // удалённой ранней историей упёрся бы в фиксированный потолок проб.
+    expect(calls[1]).toEqual({ kind: "start", upTo: 89 });
     // Читать можно сразу, первое окно уже в хранилище.
     const stored = await repo.getPosts(channel.id, { limit: 5 });
     expect(stored.map((p) => p.id)).toEqual([1, 2, 4, 5, 8]);

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { buildEpub } from "../core/export/epub.js";
 import { importChannel } from "../core/reader/importer.js";
 import type { Source } from "../core/source/types.js";
@@ -33,13 +33,21 @@ export function useChannelActions(
   const [downloaded, setDownloaded] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Карточка исчезает вместе с удалённым каналом, и докачку надо оборвать:
+  // иначе она допишет посты каналу, которого больше нет.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const downloadAll = useCallback(async () => {
     if (downloading) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setDownloading(true);
     setError(undefined);
     try {
       await importChannel(repo, source, channel.id, {
+        signal: controller.signal,
         onProgress: (progress) => setDownloaded(progress.posts),
       });
       onChanged?.();

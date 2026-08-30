@@ -328,6 +328,11 @@ button:disabled {
 .post {
   padding: 20px 0 28px;
   border-bottom: 1px solid var(--line);
+  /* Лента растёт по мере чтения и за длинную сессию набирает сотни постов.
+     Браузер пропускает отрисовку тех, что вне экрана, а contain-intrinsic-size
+     удерживает высоту, чтобы полоса прокрутки не прыгала. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
 }
 
 .post--service {

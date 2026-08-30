@@ -22,6 +22,7 @@ import type {
 } from "../../model.js";
 
 const BG_URL = /background-image\s*:\s*url\(['"]?(.*?)['"]?\)/i;
+const SAFE_SCHEMES = new Set(["https:", "http:"]);
 const SINGLE_ID = /\/(\d+)\?single/;
 const TRAILING_COUNT = /([\d.,\s ]+[KMkm]?)\s*$/;
 
@@ -33,10 +34,32 @@ function text(el: Element | null | undefined): string {
   return (el?.textContent ?? "").replace(/ /g, " ").trim();
 }
 
+/**
+ * Пропускает только адреса, которые безопасно положить в href или src.
+ *
+ * Санитайзер разметки прикрывает текст поста, но не эти поля: ссылки на медиа,
+ * превью и форварды попадают в атрибуты напрямую, а потом ещё и в книгу EPUB.
+ * Чистим на границе разбора, чтобы дальше по коду грязных адресов не было вовсе.
+ */
+export function safeUrl(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    // База нужна для протокол-относительных адресов вида //telegram.org/x.png.
+    const url = new URL(raw.trim(), "https://t.me");
+    return SAFE_SCHEMES.has(url.protocol) ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function attrUrl(el: Element | null | undefined, name: string): string | undefined {
+  return safeUrl(el?.getAttribute(name));
+}
+
 function bgUrl(el: Element | null | undefined): string | undefined {
   const style = el?.getAttribute("style");
   const m = style ? BG_URL.exec(style) : null;
-  return m?.[1] ?? undefined;
+  return safeUrl(m?.[1]);
 }
 
 /** «13K» -> 13000, «1.2M» -> 1200000, «19 083» -> 19083. */
@@ -68,7 +91,7 @@ function parseMedia(root: Element): Media[] {
     media.push({
       kind: "photo",
       thumb: bgUrl(el),
-      postUrl: el.getAttribute("href") ?? undefined,
+      postUrl: attrUrl(el, "href"),
     });
   }
 
@@ -78,9 +101,9 @@ function parseMedia(root: Element): Media[] {
       ?? el.parentElement?.querySelector("a.tgme_widget_message_video_player");
     media.push({
       kind: "video",
-      url: video?.getAttribute("src") ?? undefined,
+      url: attrUrl(video, "src"),
       thumb: bgUrl(el.querySelector(".tgme_widget_message_video_thumb")),
-      postUrl: player?.getAttribute("href") ?? undefined,
+      postUrl: attrUrl(player, "href"),
     });
   }
 
@@ -89,7 +112,7 @@ function parseMedia(root: Element): Media[] {
       kind: "document",
       title: text(el.querySelector(".tgme_widget_message_document_title")) || undefined,
       size: text(el.querySelector(".tgme_widget_message_document_extra")) || undefined,
-      postUrl: el.getAttribute("href") ?? undefined,
+      postUrl: attrUrl(el, "href"),
     });
   }
 
@@ -113,7 +136,7 @@ function parseAlbumIds(root: Element): number[] {
 
 function parseLinkPreview(root: Element): LinkPreview | undefined {
   const el = root.querySelector("a.tgme_widget_message_link_preview");
-  const url = el?.getAttribute("href");
+  const url = attrUrl(el, "href");
   if (!el || !url) return undefined;
   const preview: LinkPreview = { url };
   const site = text(el.querySelector(".link_preview_site_name")) || undefined;
@@ -134,7 +157,7 @@ function parseForwardedFrom(root: Element): ForwardedFrom | undefined {
   const link = holder.querySelector("a.tgme_widget_message_forwarded_from_name");
   const name = text(link) || text(holder).replace(/^Forwarded from\s*/i, "");
   if (!name) return undefined;
-  const url = link?.getAttribute("href");
+  const url = attrUrl(link, "href");
   return url ? { name, url } : { name };
 }
 
@@ -225,8 +248,10 @@ export function parseFeedChannelMeta(html: string): ChannelMeta | null {
   const meta: ChannelMeta = { username, title };
   const description = text(doc.querySelector(".tgme_channel_info_description"));
   if (description) meta.description = description;
-  const avatar = doc.querySelector(".tgme_page_photo_image img, .tgme_channel_info_header_photo img")
-    ?.getAttribute("src");
+  const avatar = attrUrl(
+    doc.querySelector(".tgme_page_photo_image img, .tgme_channel_info_header_photo img"),
+    "src",
+  );
   if (avatar) meta.avatar = avatar;
 
   for (const counter of doc.querySelectorAll(".tgme_channel_info_counter")) {
@@ -263,7 +288,7 @@ export function parseChannelPage(html: string): ChannelMeta | null {
   const meta: ChannelMeta = { username, title };
   const description = og("description");
   if (description) meta.description = description;
-  const avatar = og("image");
+  const avatar = safeUrl(og("image"));
   if (avatar) meta.avatar = avatar;
 
   // «19 083 subscribers» у канала против «1 293 members» у группы.

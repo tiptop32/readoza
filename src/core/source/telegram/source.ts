@@ -38,12 +38,26 @@ export function parseChannelInput(input: string): string | null {
   return candidate;
 }
 
+/** Потолок проб, когда верхняя граница id неизвестна. */
+const DEFAULT_PROBE_CEILING = 200_000;
+
 /**
  * Пробы для поиска начала канала: наименьшее N, при котором ?before=N отдаёт хоть
  * что-то. Обычно хватает первой: если пост 1 жив, ?before=2 сразу его возвращает.
- * Пробы нужны для каналов, у которых первые сотни id удалены.
+ * Пробы нужны каналам, у которых первые id удалены.
+ *
+ * Последняя проба перекрывает весь известный диапазон: у канала, где вырезаны
+ * первые сотни тысяч сообщений, начало лежит выше любой круглой степени десяти,
+ * и без этого он выглядел бы пустым.
  */
-const START_PROBES = [2, 20, 200, 2000, 20000, 200000] as const;
+export function startProbes(upTo?: number): number[] {
+  const ceiling = upTo ?? DEFAULT_PROBE_CEILING;
+  const probes: number[] = [];
+  for (let probe = 2; probe <= ceiling; probe *= 10) probes.push(probe);
+  const last = upTo === undefined ? DEFAULT_PROBE_CEILING : upTo + 1;
+  if (probes.at(-1) !== last) probes.push(last);
+  return probes;
+}
 
 /**
  * URL ленты для курсора.
@@ -56,7 +70,7 @@ export function feedUrl(channel: string, cursor: Cursor): string {
   const base = `${BASE}/s/${channel}`;
   switch (cursor.kind) {
     case "start":
-      return `${base}?before=${START_PROBES[0]}`;
+      return `${base}?before=2`;
     case "end":
       return base;
     case "before":
@@ -88,7 +102,7 @@ export function createTelegramPublicSource(transport: Transport): Source {
     },
 
     async fetchPage(channel: string, cursor: Cursor): Promise<Page> {
-      if (cursor.kind === "start") return fetchStart(transport, channel);
+      if (cursor.kind === "start") return fetchStart(transport, channel, cursor.upTo);
       return parseFeed(await transport(feedUrl(channel, cursor)));
     },
   };
@@ -99,9 +113,13 @@ export function createTelegramPublicSource(transport: Transport): Source {
  * у канала, где удалены первые сотни сообщений, ?before=2 отдаёт пустую ленту.
  * Признак начала — отсутствие курсора назад, его проверяет уже вызывающий код.
  */
-async function fetchStart(transport: Transport, channel: string): Promise<Page> {
+async function fetchStart(
+  transport: Transport,
+  channel: string,
+  upTo?: number,
+): Promise<Page> {
   let page: Page = { channel, posts: [] };
-  for (const before of START_PROBES) {
+  for (const before of startProbes(upTo)) {
     page = parseFeed(await transport(feedUrl(channel, { kind: "before", id: before })));
     if (page.posts.length > 0) return page;
   }

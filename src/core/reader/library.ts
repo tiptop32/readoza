@@ -48,7 +48,13 @@ export async function addChannel(
 
   // Канонический username берём из data-post: t.me/s/breakingmash отдаёт mash.
   const canonical = latest.channel || username;
-  const first = await source.fetchPage(canonical, { kind: "start" });
+  // Верхняя граница id уже известна из последней страницы: без неё поиск начала
+  // упрётся в фиксированный потолок на канале с удалённой ранней историей.
+  const newestId = latest.posts.at(-1)?.id;
+  const first = await source.fetchPage(
+    canonical,
+    newestId === undefined ? { kind: "start" } : { kind: "start", upTo: newestId },
+  );
   if (first.posts.length === 0) {
     throw new ReadozaError("empty-channel", `не удалось найти начало канала ${canonical}`);
   }

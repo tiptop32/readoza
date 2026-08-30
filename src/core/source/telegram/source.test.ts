@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Transport } from "../types.js";
 import { fixture } from "./fixtures.js";
-import { createTelegramPublicSource, feedUrl, parseChannelInput } from "./source.js";
+import { createTelegramPublicSource, feedUrl, parseChannelInput, startProbes } from "./source.js";
 
 describe("parseChannelInput", () => {
   it("принимает все формы ссылки на канал", () => {
@@ -35,6 +35,24 @@ describe("parseChannelInput", () => {
     ]) {
       expect(parseChannelInput(input), input).toBeNull();
     }
+  });
+});
+
+describe("startProbes", () => {
+  it("без верхней границы упирается в фиксированный потолок", () => {
+    expect(startProbes()).toEqual([2, 20, 200, 2000, 20000, 200000]);
+  });
+
+  it("перекрывает весь известный диапазон id", () => {
+    // Канал, у которого вырезаны первые полмиллиона сообщений: без последней
+    // пробы выше потолка его начало не нашлось бы и канал считался бы пустым.
+    expect(startProbes(500_000).at(-1)).toBe(500_001);
+    expect(startProbes(762)).toEqual([2, 20, 200, 763]);
+  });
+
+  it("не разрастается на крошечном канале", () => {
+    expect(startProbes(5)).toEqual([2, 6]);
+    expect(startProbes(1)).toEqual([2]);
   });
 });
 

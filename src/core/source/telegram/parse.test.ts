@@ -6,6 +6,7 @@ import {
   parseFeed,
   parseFeedChannelMeta,
   parseShortNumber,
+  safeUrl,
 } from "./parse.js";
 
 const start = fixture("feed-start.html"); // t.me/s/sys_sa?before=20 — начало канала
@@ -150,6 +151,60 @@ describe("parseFeed: длинные посты не обрезаются", () =>
   it("тексты постов не оканчиваются многоточием обрезки", () => {
     const truncated = parseFeed(latest).posts.filter((p) => /[…]\s*$/.test(p.text) && p.text.length > 500);
     expect(truncated).toHaveLength(0);
+  });
+});
+
+describe("safeUrl", () => {
+  it("пропускает обычные адреса и достраивает протокол-относительные", () => {
+    expect(safeUrl("https://cdn4.telesco.pe/file/x.jpg")).toBe("https://cdn4.telesco.pe/file/x.jpg");
+    expect(safeUrl("https://t.me/sys_sa/1")).toBe("https://t.me/sys_sa/1");
+    expect(safeUrl("//telegram.org/img/emoji/40/x.png")).toBe(
+      "https://telegram.org/img/emoji/40/x.png",
+    );
+  });
+
+  it("отбрасывает всё, что не http и не https", () => {
+    for (const bad of [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "  javascript:alert(1)  ",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+      "file:///etc/passwd",
+      "",
+      undefined,
+      null,
+    ]) {
+      expect(safeUrl(bad), String(bad)).toBeUndefined();
+    }
+  });
+});
+
+describe("parseFeed: адреса из чужой разметки", () => {
+  // Санитайзер прикрывает только текст поста. Ссылки на медиа, превью и форварды
+  // попадают прямо в href и src, поэтому чистятся на границе разбора.
+  const hostile = `<div class="tgme_widget_message" data-post="evil/1">
+    <div class="tgme_widget_message_forwarded_from"><a class="tgme_widget_message_forwarded_from_name" href="javascript:alert(1)"><span>Злой канал</span></a></div>
+    <a class="tgme_widget_message_photo_wrap" href="javascript:alert(2)" style="background-image:url('javascript:alert(3)')"></a>
+    <a class="tgme_widget_message_link_preview" href="javascript:alert(4)"><div class="link_preview_title">заголовок</div></a>
+    <div class="tgme_widget_message_text js-message_text">текст</div>
+    <a class="tgme_widget_message_date" href="https://t.me/evil/1"><time datetime="2021-08-05T10:00:00+00:00">10:00</time></a>
+  </div>`;
+
+  const post = parseFeed(hostile).posts[0];
+
+  it("не пропускает javascript: в ссылку форварда", () => {
+    expect(post?.forwardedFrom?.name).toBe("Злой канал");
+    expect(post?.forwardedFrom?.url).toBeUndefined();
+  });
+
+  it("не пропускает javascript: в медиа", () => {
+    expect(post?.media[0]?.postUrl).toBeUndefined();
+    expect(post?.media[0]?.thumb).toBeUndefined();
+  });
+
+  it("выбрасывает превью ссылки целиком, если адрес небезопасен", () => {
+    expect(post?.linkPreview).toBeUndefined();
   });
 });
 
