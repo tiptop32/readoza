@@ -105,9 +105,11 @@ test("без сети остаётся читаемым и честно об э�
   ).toBeHidden();
 });
 
-test("отдаёт канал книгой в формате EPUB", async ({ page }) => {
+test("отдаёт канал книгой в формате EPUB с карточки на главной", async ({ page }) => {
   await stubTelegram(page);
   await addChannel(page);
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { name: "Readoza" })).toBeVisible();
 
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: /export as epub/i }).click();

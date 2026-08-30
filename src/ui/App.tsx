@@ -59,11 +59,13 @@ export function App({ repo, source }: { repo: Repo; source: Source }): ReactElem
 
       <ChannelList
         repo={repo}
+        source={source}
         channels={channels}
         onOpen={(channel) => void open(channel)}
         onRemove={(channel) => {
           void repo.removeChannel(channel.id).then(refresh);
         }}
+        onChanged={() => void refresh()}
       />
     </main>
   );

@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildEpub } from "../core/export/epub.js";
-import { importChannel, importNextPage } from "../core/reader/importer.js";
+import { importNextPage } from "../core/reader/importer.js";
 import { advanceRead } from "../core/reader/progress.js";
 import type { Source } from "../core/source/types.js";
 import type { Channel, Progress, Repo, StoredPost } from "../core/storage/types.js";
-import { saveFile } from "./download.js";
-import { sanitizePostHtml } from "./sanitize.js";
 
 /** Сколько постов держим в окне подгрузки. */
 const WINDOW = 20;
@@ -25,12 +22,6 @@ export interface ReaderApi {
   /** Повторить последнюю неудавшуюся подгрузку после сбоя сети. */
   retry: () => Promise<void>;
   markRead: (postId: number) => void;
-  downloadAll: () => Promise<void>;
-  downloading: boolean;
-  downloaded: number;
-  /** Собрать книгу из того, что уже скачано, и отдать файл пользователю. */
-  exportEpub: () => Promise<void>;
-  exporting: boolean;
 }
 
 function merge(a: StoredPost[], b: StoredPost[]): StoredPost[] {
@@ -53,9 +44,6 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
   const [atEnd, setAtEnd] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [anchorId, setAnchorId] = useState<number | undefined>();
-  const [downloading, setDownloading] = useState(false);
-  const [downloaded, setDownloaded] = useState(0);
-  const [exporting, setExporting] = useState(false);
 
   const progressRef = useRef<Progress | undefined>(undefined);
   const busyRef = useRef(false);
@@ -149,34 +137,6 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     [repo, channel.id],
   );
 
-  const downloadAll = useCallback(async () => {
-    if (downloading) return;
-    setDownloading(true);
-    try {
-      await importChannel(repo, source, channel.id, {
-        onProgress: (p) => setDownloaded(p.posts),
-      });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setDownloading(false);
-    }
-  }, [downloading, repo, source, channel.id]);
-
-  const exportEpub = useCallback(async () => {
-    if (exporting) return;
-    setExporting(true);
-    try {
-      const all = await repo.getPosts(channel.id);
-      const book = buildEpub(channel, all, sanitizePostHtml);
-      saveFile(book.bytes, book.filename, "application/epub+zip");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setExporting(false);
-    }
-  }, [exporting, repo, channel]);
-
   const api: ReaderApi = {
     posts,
     loading,
@@ -184,11 +144,6 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
     loadMore,
     retry,
     markRead,
-    downloadAll,
-    downloading,
-    downloaded,
-    exportEpub,
-    exporting,
   };
   if (error) api.error = error;
   if (anchorId !== undefined) api.anchorId = anchorId;
