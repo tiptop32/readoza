@@ -17,7 +17,9 @@
     "test:proxy": "npm --prefix services/telegram-proxy test",
     "eval:dist": "playwright test --config playwright.pages.config.ts",
     "eval:live-site": "playwright test --config playwright.live.config.ts",
-    "eval:proxy": "npm --prefix services/telegram-proxy run eval"
+    "eval:proxy": "npm --prefix services/telegram-proxy run eval",
+    "test:sync": "npm --prefix services/sync test",
+    "eval:sync": "npm --prefix services/sync run eval"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

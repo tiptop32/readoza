@@ -1,7 +1,8 @@
 # Pages publication checklist
 
 Acceptance reference: a static installable reader at `/readoza/`, with a fixed-host
-Telegram proxy, saved progress after reload, and a working offline start. Local
+Telegram proxy, optional nickname sync through a separate D1 Worker, saved progress
+after reload, and a working offline start. Local
 development must still work at `/`. The first publication requires approval.
 
 Use this checklist for every deployment change. It records the failures found
@@ -47,3 +48,22 @@ Official references:
 - [What is GitHub Pages?](https://docs.github.com/en/pages/getting-started-with-github-pages/about-github-pages)
 - [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
 - [Vite: Deploying a Static Site](https://vite.dev/guide/static-deploy.html#github-pages)
+
+## Nickname sync release
+
+1. Create the `readoza-sync` D1 database and save its UUID as the repository Actions
+   variable `READOZA_D1_DATABASE_ID`. The Cloudflare API token needs D1 Edit in
+   addition to Workers Scripts Edit.
+2. Run the manual **Reader sync** workflow. It runs service tests, the scenario eval,
+   a Worker dry-run, applies D1 migrations, then deploys the Worker.
+3. Save its HTTPS `workers.dev` origin as `VITE_SYNC_URL` (no trailing path). Run
+   the manual **Pages** workflow. Its built-artifact browser eval uses two browser
+   profiles to check channel and progress sync before uploading the site.
+4. At the public URL, create a throwaway nickname and recovery code on one device,
+   add a channel and read past the first post. On a second browser profile, use the
+   same nickname and code and verify the channel opens at that post. Remove it there
+   and verify removal on the first profile after the next sync.
+
+The code is a bearer credential. Never put a real recovery code in a GitHub secret,
+log, issue, or screenshot. The Worker stores only a salted hash and a 64 KiB capped
+snapshot of channel metadata and reading positions; post bodies remain local.

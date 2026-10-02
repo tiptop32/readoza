@@ -517,3 +517,20 @@ button:disabled {
 .post__text .emoji {
   font-style: normal;
 }
+
+.sync-account {
+  margin: 0 0 28px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.sync-account h2 { margin: 0 0 8px; font-size: 18px; }
+.sync-account p { margin: 8px 0 12px; color: var(--muted); font-size: 14px; }
+.sync-account label { display: block; margin: 10px 0 4px; font-size: 14px; }
+.sync-account input {
+  display: block; width: 100%; max-width: 420px; padding: 8px 10px;
+  color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+}
+.sync-account__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sync-account__code { display: block; overflow-wrap: anywhere; margin-top: 12px; font-family: monospace; }

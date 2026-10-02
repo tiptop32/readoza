@@ -4,7 +4,8 @@
 
 Telegram drops you at the newest message. Readoza does the opposite: it finds post #1 of a
 public channel, walks forward in chronological order, and remembers your position between
-sessions. Local-first, no account, no server for the core loop.
+sessions. Reading remains local-first; optional nickname and recovery-code sync keeps
+channels and reading positions aligned across devices.
 
 > Status: **v0.1 works end to end in the browser.** Paste a channel, read from post one,
 > close the tab, come back to the same place. Desktop and mobile builds, offline export and
@@ -121,6 +122,22 @@ src/
   ui/                         React reader: omnibox, channel list, continuous scroll
 ```
 
+## Sync between devices
+
+On the home screen, enter a nickname (3–32 lowercase Latin letters, digits, `_` or `-`),
+choose **Create code**, save the 32-character code, then connect. On another device,
+enter the same nickname and code. A new account copies the current guest library,
+including downloaded posts, into its separate local library. Subsequent devices
+fetch channel metadata and the saved reading position; post text is downloaded from
+Telegram as needed. Deletions and offline edits sync when connectivity returns.
+
+The code is the only way to recover access on another device. Keep a copy outside
+this browser. Cloudflare stores a salted hash, channel metadata and progress;
+post bodies remain local. Signing out returns to the guest library on that device.
+
+The sync service lives in [`services/sync`](services/sync/README.md). Its D1 database
+and Worker must be deployed before publishing a Pages build with `VITE_SYNC_URL`.
+
 ## Development
 
 ```bash
@@ -133,11 +150,12 @@ npm run typecheck
 
 The public site can run at `https://tiptop32.github.io/readoza/`. Pages serves the
 static app; a Cloudflare Worker fetches Telegram HTML because `t.me` does not allow
-cross-origin browser requests. Posts and reading position stay in IndexedDB on each
-device. Switching from localhost to Pages creates a separate browser library.
+cross-origin browser requests. Posts stay in IndexedDB on each device. With optional
+sync, channel metadata and reading positions are copied through a Cloudflare Worker
+and D1; each nickname has its own local IndexedDB library.
 
-Both publications are **manual**. Main pushes and pull requests validate the app;
-only `workflow_dispatch` publishes. No custom domain or paid server is required.
+All production publications are **manual**. Main pushes and pull requests validate
+the app; only `workflow_dispatch` publishes. No custom domain or paid server is required.
 
 After reviewing and approving the first publication:
 
