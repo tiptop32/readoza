@@ -66,11 +66,25 @@ test("Pages artifact imports through the Worker, restores progress and starts of
     await page.getByRole("button", { name: /^Системный Аналитик/ }).click();
     await expect(page.locator(`#post-${readId}`)).toBeVisible();
     await page.screenshot({ path: `${evidence}/pages-reader.png`, fullPage: false });
+    // Remove fixture routes: they must not provide responses while the network is off.
+    await page.unrouteAll({ behavior: "wait" });
     await context.setOffline(true);
+    const networkBlocked = await page.evaluate(async () => {
+      try {
+        await fetch(`/readoza/not-cached-${Date.now()}`, { cache: "no-store" });
+        return false;
+      } catch { return true; }
+    });
+    expect(networkBlocked).toBe(true);
     await page.reload();
     await expect(page.getByRole("heading", { name: "Readoza" })).toBeVisible();
     await page.getByRole("button", { name: /^Системный Аналитик/ }).click();
     await expect(page.locator(`#post-${readId}`)).toBeVisible();
+    // CDP network emulation can keep navigator.onLine true after a SW navigation.
+    // Verify network denial separately above, then supply the OS connectivity event
+    // just as the existing development-browser tests do.
+    console.log("Offline startup navigator.onLine:", await page.evaluate(() => navigator.onLine));
+    await page.evaluate(() => window.dispatchEvent(new Event("offline")));
     await expect(page.getByText("You are offline. Everything already downloaded is still readable.")).toBeVisible();
     expect(errors).toEqual([]);
     await page.screenshot({ path: `${evidence}/pages-offline.png`, fullPage: false });

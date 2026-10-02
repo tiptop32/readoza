@@ -20,7 +20,9 @@ during the first implementation and makes their detection part of the workflow:
 7. Run `npm run eval:dist` with the same `VITE_TG_PROXY` used for the Pages build.
    File-existence checks do not establish that the application opens or works offline.
 8. Check the JSON report and screenshots. The browser must load the built artifact,
-   fetch through the Worker, restore progress, and reload while offline. If the
+   fetch through the Worker, restore progress, and reload while offline. Remove
+   fixture routes before disconnecting and prove that an uncached fetch fails;
+   network emulation and OS connectivity events are separate test inputs. If the
    environment cannot launch Chromium, record the failure and use CI; never call it green.
 9. Get an independent review against the acceptance reference. Keep evidence under
    `/tmp`, and use the Actions verification artifact for remote runs.
