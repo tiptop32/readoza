@@ -9,10 +9,9 @@ kept in that browser's localStorage and must be copied to each new device. D1 st
 only a salted hash of the code plus channel metadata and reading positions. Telegram
 post bodies stay on each device. The snapshot limit is 64 KiB.
 
-To publish, create a free D1 database named `readoza-sync`, save its UUID as the
-GitHub Actions variable `READOZA_D1_DATABASE_ID`, and give the Cloudflare token
-D1 Edit and Workers Scripts Edit for this account. Run the manual **Reader sync**
-workflow. It applies migrations before deploying the Worker. Save the resulting
-HTTPS Worker origin (no path) in the Actions variable `VITE_SYNC_URL`, then run
-the manual **Pages** workflow. `npm --prefix services/sync test`, `eval`, and
+To publish, the Cloudflare token needs D1 Edit and Workers Scripts Edit for this
+account. Run the manual **Reader sync** workflow. It reuses the `readoza-sync` D1
+database or creates it in Eastern Europe, applies migrations, and deploys the Worker.
+Then run the manual **Pages** workflow; its build uses the Worker origin
+`https://readoza-sync.tiptop32-readoza.workers.dev`. `npm --prefix services/sync test`, `eval`, and
 `build` can run locally without Cloudflare credentials.

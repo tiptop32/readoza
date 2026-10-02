@@ -31,20 +31,15 @@ jobs:
           VITE_BASE_PATH: /readoza/
           # PR/CI use a deterministic fixture endpoint. Publication requires the real variable.
           VITE_TG_PROXY: ${{ github.event_name == 'workflow_dispatch' && vars.VITE_TG_PROXY || 'https://proxy.example/tg' }}
-          VITE_SYNC_URL: ${{ github.event_name == 'workflow_dispatch' && vars.VITE_SYNC_URL || 'https://sync.example' }}
+          VITE_SYNC_URL: ${{ github.event_name == 'workflow_dispatch' && 'https://readoza-sync.tiptop32-readoza.workers.dev' || 'https://sync.example' }}
       - name: Require the production proxy for publication
         if: github.event_name == 'workflow_dispatch'
         run: node -e 'if (!process.env.VITE_TG_PROXY) throw new Error("Set repository variable VITE_TG_PROXY before publishing")'
         env:
           VITE_TG_PROXY: ${{ vars.VITE_TG_PROXY }}
-      - name: Require sync endpoint for publication
-        if: github.event_name == 'workflow_dispatch'
-        run: node -e 'if (!/^https:\/\/[^/]+$/.test(process.env.VITE_SYNC_URL ?? "")) throw new Error("Set VITE_SYNC_URL to the HTTPS sync Worker origin")'
-        env:
-          VITE_SYNC_URL: ${{ vars.VITE_SYNC_URL }}
       - run: npm run eval:dist
         env:
-          VITE_SYNC_URL: ${{ github.event_name == 'workflow_dispatch' && vars.VITE_SYNC_URL || 'https://sync.example' }}
+          VITE_SYNC_URL: ${{ github.event_name == 'workflow_dispatch' && 'https://readoza-sync.tiptop32-readoza.workers.dev' || 'https://sync.example' }}
           VITE_TG_PROXY: ${{ github.event_name == 'workflow_dispatch' && vars.VITE_TG_PROXY || 'https://proxy.example/tg' }}
           READOZA_EVIDENCE_DIR: ${{ runner.temp }}/readoza-pages
       - uses: actions/upload-artifact@v4

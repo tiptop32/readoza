@@ -51,13 +51,12 @@ Official references:
 
 ## Nickname sync release
 
-1. Create the `readoza-sync` D1 database and save its UUID as the repository Actions
-   variable `READOZA_D1_DATABASE_ID`. The Cloudflare API token needs D1 Edit in
-   addition to Workers Scripts Edit.
+1. The sync workflow reuses or creates the `readoza-sync` D1 database in Eastern
+   Europe. The Cloudflare API token needs D1 Edit in addition to Workers Scripts Edit.
 2. Run the manual **Reader sync** workflow. It runs service tests, the scenario eval,
    a Worker dry-run, applies D1 migrations, then deploys the Worker.
-3. Save its HTTPS `workers.dev` origin as `VITE_SYNC_URL` (no trailing path). Run
-   the manual **Pages** workflow. Its built-artifact browser eval uses two browser
+3. Run the manual **Pages** workflow. It uses the Worker origin
+   `https://readoza-sync.tiptop32-readoza.workers.dev`. Its built-artifact browser eval uses two browser
    profiles to check channel and progress sync before uploading the site.
 4. At the public URL, create a throwaway nickname and recovery code on one device,
    add a channel and read past the first post. On a second browser profile, use the
