@@ -20,6 +20,18 @@ describe("proxyUrl", () => {
 
   it("не трогает посторонние адреса", () => {
     expect(proxyUrl("https://example.com/x", "/tg")).toBe("https://example.com/x");
+    expect(proxyUrl("https://t.me.evil.example/s/sys_sa", "/tg")).toBe(
+      "https://t.me.evil.example/s/sys_sa",
+    );
+    expect(proxyUrl("https://t.me@evil.example/s/sys_sa", "/tg")).toBe(
+      "https://t.me@evil.example/s/sys_sa",
+    );
+  });
+
+  it("принимает адрес прокси с завершающим слешем", () => {
+    expect(proxyUrl("https://t.me/s/sys_sa?before=2", "https://proxy.example/tg/")).toBe(
+      "https://proxy.example/tg/s/sys_sa?before=2",
+    );
   });
 });
 
