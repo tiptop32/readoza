@@ -26,7 +26,10 @@ during the first implementation and makes their detection part of the workflow:
    environment cannot launch Chromium, record the failure and use CI; never call it green.
 9. Get an independent review against the acceptance reference. Keep evidence under
    `/tmp`, and use the Actions verification artifact for remote runs.
-10. After approval, deploy the Worker, configure `VITE_TG_PROXY`, enable Pages, and
+10. Before the first Actions deployment, open Cloudflare Workers & Pages once to
+    create the account's `workers.dev` subdomain, or run the interactive local
+    `npm run deploy` to register it. A successful API-token check does not prove this
+    onboarding step is complete. After approval, deploy the Worker, configure `VITE_TG_PROXY`, enable Pages, and
     run the manual Pages workflow. Run the Worker's live eval and repeat the reader
     smoke test at the public URL. Do not report publication before those checks pass.
 

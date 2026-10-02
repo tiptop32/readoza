@@ -220,6 +220,17 @@ broken markup is noticed before users notice it):
 READOZA_LIVE=1 npm test
 ```
 
+After Pages and the Worker are published, run the manual live smoke test:
+
+```bash
+READOZA_EVIDENCE_DIR=/tmp/readoza-live npm run eval:live-site
+```
+
+This uses the public Pages URL and Worker with real Telegram responses. It is separate from
+the deterministic fixture suites and can fail because the deployed site, Worker, Telegram, or
+the network is unavailable. GitHub Actions exposes it as the manual **Live site verification**
+workflow and uploads its JSON and screenshots.
+
 When the parser tests fail, refresh the fixtures first and read the HTML diff:
 
 ```bash

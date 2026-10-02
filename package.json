@@ -16,6 +16,7 @@
     "fixtures": "./scripts/fetch-fixtures.sh",
     "test:proxy": "npm --prefix services/telegram-proxy test",
     "eval:dist": "playwright test --config playwright.pages.config.ts",
+    "eval:live-site": "playwright test --config playwright.live.config.ts",
     "eval:proxy": "npm --prefix services/telegram-proxy run eval"
   },
   "devDependencies": {
