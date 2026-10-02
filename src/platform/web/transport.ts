@@ -17,7 +17,8 @@ const TELEGRAM_ORIGIN = "https://t.me";
 const PROXY_BASE: string = import.meta.env.VITE_TG_PROXY ?? "/tg";
 
 export function proxyUrl(url: string, base: string = PROXY_BASE): string {
-  return url.startsWith(TELEGRAM_ORIGIN) ? base + url.slice(TELEGRAM_ORIGIN.length) : url;
+  const telegram = url === TELEGRAM_ORIGIN || url.startsWith(`${TELEGRAM_ORIGIN}/`);
+  return telegram ? base.replace(/\/$/, "") + url.slice(TELEGRAM_ORIGIN.length) : url;
 }
 
 export function createWebTransport(base: string = PROXY_BASE): Transport {

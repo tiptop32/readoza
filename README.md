@@ -129,6 +129,80 @@ npm test          # offline, deterministic, ~2.5 s
 npm run typecheck
 ```
 
+## GitHub Pages
+
+The public site can run at `https://tiptop32.github.io/readoza/`. Pages serves the
+static app; a Cloudflare Worker fetches Telegram HTML because `t.me` does not allow
+cross-origin browser requests. Posts and reading position stay in IndexedDB on each
+device. Switching from localhost to Pages creates a separate browser library.
+
+Both publications are **manual**. Main pushes and pull requests validate the app;
+only `workflow_dispatch` publishes. No custom domain or paid server is required.
+
+After reviewing and approving the first publication:
+
+1. Create a free Cloudflare account. Install the proxy dependencies and log in locally:
+
+   ```bash
+   npm ci --prefix services/telegram-proxy
+   npm --prefix services/telegram-proxy run login
+   ```
+
+2. Deploy the Worker and save the HTTPS `workers.dev` URL printed by Wrangler:
+
+   ```bash
+   npm --prefix services/telegram-proxy run deploy
+   ```
+
+   The browser proxy address is that URL with `/tg` appended. The Worker allows the
+   origin `https://tiptop32.github.io`. For a custom domain, change
+   `READOZA_ALLOWED_ORIGIN` in `services/telegram-proxy/wrangler.toml` before deployment.
+
+3. In repository **Settings → Secrets and variables → Actions → Variables**, add
+   `VITE_TG_PROXY` with the full HTTPS address ending in `/tg`. This address is public;
+   it is embedded in the static JavaScript. No Cloudflare credential goes into Vite variables.
+
+4. In **Settings → Pages → Build and deployment**, select **GitHub Actions**. In
+   **Actions → Pages → Run workflow**, select `main` and run the workflow. Publication
+   is blocked if the proxy variable is missing or invalid. Tests and the browser eval
+   run against the exact build before it is uploaded.
+
+For later Worker publications through Actions, create a Cloudflare API token scoped
+to this account with **Account → Workers Scripts → Edit**. Save it as the GitHub secret
+`CLOUDFLARE_API_TOKEN`, and save the account ID as `CLOUDFLARE_ACCOUNT_ID`. Run the
+manual **Telegram proxy** workflow. Local OAuth login is enough for the first deployment;
+these secrets are only required for the Actions deployment. Environment approvals can
+be configured for `github-pages` and `cloudflare` in repository Settings.
+
+Local Pages verification uses a fixture endpoint, so it needs no Cloudflare account:
+
+```bash
+npm ci
+npm test
+npm run test:proxy
+npm run eval:proxy
+npx playwright install chromium
+VITE_BASE_PATH=/readoza/ VITE_TG_PROXY=https://proxy.example/tg npm run build
+VITE_TG_PROXY=https://proxy.example/tg npm run eval:dist
+```
+
+`proxy.example` is intercepted by the browser eval and answered by the real Worker
+handler using saved Telegram HTML. It is not a live proxy. Use the actual Worker URL
+when publishing. `VITE_BASE_PATH` defaults to `/`, so the existing development and
+root deployment paths keep working. The Pages eval serves only `dist` under
+`/readoza/` and checks channel import, saved reading position, manifest assets, service
+worker scope and an offline reload. Its pass threshold is 100%; JSON results and
+screenshots go to `/tmp/readoza-pages/` locally and the `pages-verification` artifact in CI.
+
+Cloudflare Workers Free currently allows 100,000 requests/day; one channel import can
+use many requests. The Worker holds no database, rejects arbitrary hosts and paths,
+buffers at most 1.5 MB of HTML, and applies a 12-second deadline to the complete upstream
+request. Safe channel alias redirects stay on `https://t.me`; errors preserve their
+status and CORS headers. CORS is a browser restriction, not authentication or an abuse
+quota. Telegram's HTML remains an undocumented dependency. See the
+[Worker README](services/telegram-proxy/README.md) and the
+[publication checklist](docs/deployment.md) for live verification and failure handling.
+
 Browser tests. These cover what jsdom cannot: real scrolling, `IntersectionObserver`, and
 whether reading position survives a page reload. They need no network either, because Telegram
 requests are intercepted inside the browser and answered from the same saved fixtures, so the

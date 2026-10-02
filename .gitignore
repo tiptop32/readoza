@@ -227,3 +227,5 @@ dist/
 # Playwright
 test-results/
 playwright-report/
+# Cloudflare local runtime state (never deploy or commit it).
+.wrangler/
