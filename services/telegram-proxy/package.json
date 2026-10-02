@@ -1,0 +1,15 @@
+{
+  "name": "readoza-telegram-proxy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/*.test.mjs",
+    "eval": "node eval/run.mjs",
+    "eval:live": "node eval/live.mjs",
+    "dev": "wrangler dev",
+    "login": "wrangler login",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run --outdir dist"
+  },
+  "devDependencies": { "wrangler": "4.146.0" }
+}

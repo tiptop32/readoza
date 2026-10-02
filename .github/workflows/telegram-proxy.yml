@@ -1,0 +1,49 @@
+name: Telegram proxy
+on:
+  pull_request:
+    paths:
+      - services/telegram-proxy/**
+      - .github/workflows/telegram-proxy.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: telegram-proxy-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/telegram-proxy/package-lock.json
+      - run: npm ci --prefix services/telegram-proxy
+      - run: npm --prefix services/telegram-proxy test
+      - run: npm --prefix services/telegram-proxy run eval
+      - run: npm --prefix services/telegram-proxy run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: telegram-proxy-build
+          path: services/telegram-proxy/dist
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: cloudflare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/telegram-proxy/package-lock.json
+      - run: npm ci --prefix services/telegram-proxy
+      - run: npm --prefix services/telegram-proxy run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
