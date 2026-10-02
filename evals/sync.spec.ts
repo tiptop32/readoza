@@ -83,7 +83,7 @@ test("two browser profiles share channels and reading position using nickname an
     await pageA.getByRole("button", { name: "Создать код" }).click();
     const code = await pageA.getByLabel("Секретный код").inputValue();
     expect(code).toMatch(/^[0-9a-f]{32}$/);
-    await pageA.getByRole("button", { name: "Подключить профиль" }).click();
+    await pageA.getByRole("button", { name: "Создать профиль" }).click();
     await expect(pageA.getByText("Профиль:")).toBeVisible();
     await pageA.getByLabel("Telegram channel").fill("t.me/sys_sa");
     await pageA.getByRole("button", { name: /start from the beginning/i }).click();
@@ -96,7 +96,7 @@ test("two browser profiles share channels and reading position using nickname an
     await pageB.goto("./");
     await pageB.getByLabel("Никнейм").fill("reader_one");
     await pageB.getByLabel("Секретный код").fill(code);
-    await pageB.getByRole("button", { name: "Подключить профиль" }).click();
+    await pageB.getByRole("button", { name: "Войти" }).click();
     await expect(pageB.getByRole("button", { name: /^Системный Аналитик/ })).toBeVisible();
     await pageB.getByRole("button", { name: /^Системный Аналитик/ }).click();
     await expect(pageB.locator(`#post-${savedId}`)).toBeVisible();

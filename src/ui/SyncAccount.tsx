@@ -18,6 +18,7 @@ export function SyncAccount({
   const [nickname, setNickname] = useState("");
   const [code, setCode] = useState("");
   const [showCode, setShowCode] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const syncUrl = import.meta.env.VITE_SYNC_URL as string | undefined;
@@ -34,9 +35,9 @@ export function SyncAccount({
     try {
       const response = await fetch(`${syncUrl.replace(/\/$/, "")}/v1/sync/login`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname: name, code }),
+        body: JSON.stringify({ nickname: name, code, create: creating }),
       });
-      if (!response.ok) throw new Error(response.status === 401 ? "Неверный код для этого никнейма" : "Не удалось подключиться");
+      if (!response.ok) throw new Error(response.status === 401 ? "Неверный код для этого никнейма" : response.status === 404 ? "Профиль не найден" : response.status === 409 ? "Никнейм уже занят" : "Не удалось подключиться");
       const data = await response.json() as { created: boolean };
       if (data.created) {
         const accountRepo = await createIdbRepo(accountDbName(name));
@@ -86,11 +87,12 @@ export function SyncAccount({
             onChange={(event) => setNickname(event.target.value)} placeholder="my_name" />
           <label htmlFor="sync-code">Секретный код</label>
           <input id="sync-code" autoComplete="off" spellCheck={false} value={code}
-            onChange={(event) => setCode(event.target.value.toLowerCase())} placeholder="32 символа" />
+            onChange={(event) => { setCode(event.target.value.toLowerCase()); setCreating(false); }} placeholder="32 символа" />
           <div className="sync-account__actions">
-            <button type="button" disabled={busy} onClick={() => void submit()}>Подключить профиль</button>
+            <button type="button" disabled={busy} onClick={() => void submit()}>{creating ? "Создать профиль" : "Войти"}</button>
             <button type="button" disabled={busy} onClick={() => {
               setCode(generateRecoveryCode());
+              setCreating(true);
               setMessage("Сохраните код. Без него восстановить профиль на другом устройстве нельзя.");
             }}>Создать код</button>
           </div>

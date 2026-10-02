@@ -33,8 +33,8 @@ async function call(path, body) {
 }
 const channel = { id: 'telegram-public:news', source: 'telegram-public', username: 'news', title: 'News', importState: 'none', addedAt: '2026-01-01T00:00:00Z' };
 const snapshot = { channels: [channel], progress: { [channel.id]: { channelId: channel.id, lastReadId: 42, furthestReadId: 42, lastReadAt: '2026-01-02T00:00:00Z', startedAt: '2026-01-01T00:00:00Z' } } };
-assert.equal((await call('/v1/sync/login', { nickname: 'reader1', code })).status, 200);
-assert.equal((await call('/v1/sync/login', { nickname: 'reader2', code })).status, 200);
+assert.equal((await call('/v1/sync/login', { nickname: 'reader1', code, create: true })).status, 200);
+assert.equal((await call('/v1/sync/login', { nickname: 'reader2', code, create: true })).status, 200);
 assert.equal((await call('/v1/sync/save', { nickname: 'reader1', code, baseRevision: 0, snapshot })).status, 200);
 assert.equal((await call('/v1/sync/save', { nickname: 'reader1', code, baseRevision: 0, snapshot })).status, 409);
 assert.deepEqual((await call('/v1/sync/login', { nickname: 'reader1', code })).body.snapshot, snapshot);

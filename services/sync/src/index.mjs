@@ -105,6 +105,8 @@ async function login(db, data) {
   credentials(data);
   let account = await findAccount(db, data.nickname);
   let created = false;
+  if (!account && data.create !== true) throw new Error('account not found');
+  if (account && data.create === true) throw new Error('nickname already taken');
   if (!account) {
     const salt = randomHex();
     const hash = await hashCode(data.code, salt);
@@ -162,6 +164,12 @@ export async function handleRequest(request, env) {
     if (path === '/v1/sync/login') return json(await login(env.DB, data), 200, origin, allowedOrigin);
     return await save(env.DB, data, origin, allowedOrigin);
   } catch (cause) {
+    if (cause instanceof Error && cause.message === 'account not found') {
+      return fail(cause.message, 404, origin, allowedOrigin);
+    }
+    if (cause instanceof Error && cause.message === 'nickname already taken') {
+      return fail(cause.message, 409, origin, allowedOrigin);
+    }
     if (cause instanceof Error && cause.message === 'invalid credentials') {
       return fail('invalid credentials', 401, origin, allowedOrigin);
     }

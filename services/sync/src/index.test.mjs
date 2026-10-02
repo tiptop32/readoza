@@ -41,8 +41,8 @@ const snapshot = { channels: [channel], progress: { [channel.id]: progress } };
 
 test('two accounts keep independent snapshots and reject the other code', async () => {
   const db = new MemoryDB();
-  assert.equal((await (await call(db, '/v1/sync/login', { nickname: 'alice', code })).json()).created, true);
-  assert.equal((await call(db, '/v1/sync/login', { nickname: 'bob', code: otherCode })).status, 200);
+  assert.equal((await (await call(db, '/v1/sync/login', { nickname: 'alice', code, create: true })).json()).created, true);
+  assert.equal((await call(db, '/v1/sync/login', { nickname: 'bob', code: otherCode, create: true })).status, 200);
   assert.equal((await call(db, '/v1/sync/save', { nickname: 'alice', code, baseRevision: 0, snapshot })).status, 200);
   const bob = await (await call(db, '/v1/sync/login', { nickname: 'bob', code: otherCode })).json();
   assert.deepEqual(bob.snapshot, { channels: [], progress: {} });
@@ -53,7 +53,7 @@ test('two accounts keep independent snapshots and reject the other code', async 
 
 test('revision conflict preserves the committed snapshot', async () => {
   const db = new MemoryDB();
-  await call(db, '/v1/sync/login', { nickname: 'alice', code });
+  await call(db, '/v1/sync/login', { nickname: 'alice', code, create: true });
   assert.equal((await call(db, '/v1/sync/save', { nickname: 'alice', code, baseRevision: 0, snapshot })).status, 200);
   const stale = await call(db, '/v1/sync/save', { nickname: 'alice', code, baseRevision: 0, snapshot: { channels: [], progress: {} } });
   assert.equal(stale.status, 409);
@@ -63,7 +63,7 @@ test('revision conflict preserves the committed snapshot', async () => {
 
 test('rejects invalid snapshot and request bodies at the API boundary', async () => {
   const db = new MemoryDB();
-  await call(db, '/v1/sync/login', { nickname: 'alice', code });
+  await call(db, '/v1/sync/login', { nickname: 'alice', code, create: true });
   const invalid = { channels: [channel], progress: { [channel.id]: { ...progress, lastReadId: -1 } } };
   assert.equal((await call(db, '/v1/sync/save', { nickname: 'alice', code, baseRevision: 0, snapshot: invalid })).status, 400);
   assert.equal((await call(db, '/v1/sync/save', { nickname: 'alice', code, baseRevision: 0, snapshot: { ...snapshot, posts: ['secret'] } })).status, 400);
@@ -79,4 +79,12 @@ test('only the configured browser origin gets CORS and access', async () => {
   const preflight = await handleRequest(new Request('https://sync.test/v1/sync/login', { method: 'OPTIONS', headers: { Origin: origin } }), { DB: db, READOZA_ALLOWED_ORIGIN: origin });
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), origin);
+});
+
+test('unknown login does not silently reserve a nickname', async () => {
+  const db = new MemoryDB();
+  assert.equal((await call(db, '/v1/sync/login', { nickname: 'alice', code })).status, 404);
+  assert.equal(db.rows.size, 0);
+  assert.equal((await call(db, '/v1/sync/login', { nickname: 'alice', code, create: true })).status, 200);
+  assert.equal((await call(db, '/v1/sync/login', { nickname: 'alice', code: otherCode, create: true })).status, 409);
 });

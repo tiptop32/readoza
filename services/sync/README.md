@@ -1,6 +1,6 @@
 # Readoza sync
 
-Cloudflare Worker + D1 service for nickname and 128-bit code synchronization. The code is salted and hashed; plaintext codes are never stored. `POST /v1/sync/login` creates or authenticates an account. `POST /v1/sync/save` performs a compare-and-swap update and returns `409` with the current snapshot on a stale revision.
+Cloudflare Worker + D1 service for nickname and 128-bit code synchronization. The code is salted and hashed; plaintext codes are never stored. `POST /v1/sync/login` creates an account only with `create: true`; otherwise it authenticates an existing nickname. `POST /v1/sync/save` performs a compare-and-swap update and returns `409` with the current snapshot on a stale revision.
 
 Create a D1 database, put its ID in `wrangler.toml`, apply `wrangler d1 migrations apply readoza-sync --remote`, then deploy with `wrangler deploy`.
 
