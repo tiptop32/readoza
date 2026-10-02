@@ -1,0 +1,11 @@
+name = "readoza-sync"
+main = "src/index.mjs"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "readoza-sync"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+READOZA_ALLOWED_ORIGIN = "https://tiptop32.github.io"
