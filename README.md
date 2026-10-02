@@ -4,11 +4,12 @@
 
 Telegram drops you at the newest message. Readoza does the opposite: it finds post #1 of a
 public channel, walks forward in chronological order, and remembers your position between
-sessions. Local-first, no account, no server for the core loop.
+sessions. Reading remains local-first; optional nickname and recovery-code sync keeps
+channels and reading positions aligned across devices.
 
-> Status: **v0.1 works end to end in the browser.** Paste a channel, read from post one,
-> close the tab, come back to the same place. Desktop and mobile builds, offline export and
-> bookmarks are next.
+> Status: **v0.1 is published and works end to end in the browser.** The public app is
+> available at https://tiptop32.github.io/readoza/. Paste a channel, read from post one,
+> close the tab, and come back to the same place. Desktop and mobile builds are next.
 
 ```bash
 npm install
@@ -121,6 +122,23 @@ src/
   ui/                         React reader: omnibox, channel list, continuous scroll
 ```
 
+## Sync between devices
+
+On the home screen, enter a nickname (3–32 lowercase Latin letters, digits, `_` or `-`),
+choose **Создать код**, and save the generated 32-character code. Then choose **Создать профиль**.
+On another device, enter the same nickname and code, then choose **Войти**. A new account copies the current guest library,
+including downloaded posts, into its separate local library. Subsequent devices
+fetch channel metadata and the saved reading position; post text is downloaded from
+Telegram as needed. Deletions and offline edits sync when connectivity returns.
+
+The code is the only way to recover access on another device. Keep a copy outside
+this browser. Cloudflare stores a salted hash, channel metadata and progress;
+post bodies remain local. Signing out returns to the guest library on that device.
+
+The sync service lives in [`services/sync`](services/sync/README.md). It is published at
+https://readoza-sync.tiptop32-readoza.workers.dev. The production Pages workflow embeds
+this Worker URL, so `VITE_SYNC_URL` is not required for a Pages publication.
+
 ## Development
 
 ```bash
@@ -131,13 +149,14 @@ npm run typecheck
 
 ## GitHub Pages
 
-The public site can run at `https://tiptop32.github.io/readoza/`. Pages serves the
+The public site is available at `https://tiptop32.github.io/readoza/`. Pages serves the
 static app; a Cloudflare Worker fetches Telegram HTML because `t.me` does not allow
-cross-origin browser requests. Posts and reading position stay in IndexedDB on each
-device. Switching from localhost to Pages creates a separate browser library.
+cross-origin browser requests. Posts stay in IndexedDB on each device. With optional
+sync, channel metadata and reading positions are copied through a Cloudflare Worker
+and D1; each nickname has its own local IndexedDB library.
 
-Both publications are **manual**. Main pushes and pull requests validate the app;
-only `workflow_dispatch` publishes. No custom domain or paid server is required.
+All production publications are **manual**. Main pushes and pull requests validate
+the app; only `workflow_dispatch` publishes. No custom domain or paid server is required.
 
 After reviewing and approving the first publication:
 
@@ -167,12 +186,14 @@ After reviewing and approving the first publication:
    is blocked if the proxy variable is missing or invalid. Tests and the browser eval
    run against the exact build before it is uploaded.
 
-For later Worker publications through Actions, create a Cloudflare API token scoped
-to this account with **Account → Workers Scripts → Edit**. Save it as the GitHub secret
-`CLOUDFLARE_API_TOKEN`, and save the account ID as `CLOUDFLARE_ACCOUNT_ID`. Run the
-manual **Telegram proxy** workflow. Local OAuth login is enough for the first deployment;
-these secrets are only required for the Actions deployment. Environment approvals can
-be configured for `github-pages` and `cloudflare` in repository Settings.
+For Worker publications through Actions, create a Cloudflare API token scoped to this
+account with **Account → D1 → Edit** and **Account → Workers Scripts → Edit**. Save it
+as the GitHub secret `CLOUDFLARE_API_TOKEN`, and save the account ID as
+`CLOUDFLARE_ACCOUNT_ID`. Use the manual **Telegram proxy** workflow to deploy the Telegram
+proxy, or **Reader sync** to deploy the sync Worker and apply its D1 migrations. Local OAuth
+login is enough for a local proxy deployment; these secrets are required by the Actions
+deployments. Environment approvals can be configured for `github-pages` and `cloudflare`
+in repository Settings.
 
 Local Pages verification uses a fixture endpoint, so it needs no Cloudflare account:
 
@@ -219,6 +240,17 @@ broken markup is noticed before users notice it):
 ```bash
 READOZA_LIVE=1 npm test
 ```
+
+After Pages and the Worker are published, run the manual live smoke test:
+
+```bash
+READOZA_EVIDENCE_DIR=/tmp/readoza-live npm run eval:live-site
+```
+
+This uses the public Pages URL and Worker with real Telegram responses. It is separate from
+the deterministic fixture suites and can fail because the deployed site, Worker, Telegram, or
+the network is unavailable. GitHub Actions exposes it as the manual **Live site verification**
+workflow and uploads its JSON and screenshots.
 
 When the parser tests fail, refresh the fixtures first and read the HTML diff:
 

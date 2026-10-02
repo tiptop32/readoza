@@ -3,13 +3,16 @@ import type { ReactElement } from "react";
 import { touchChannel } from "../core/reader/library.js";
 import type { Source } from "../core/source/types.js";
 import type { Channel, Repo } from "../core/storage/types.js";
+import type { SyncClient } from "../core/storage/sync.js";
+import { SyncAccount } from "./SyncAccount.js";
 import { AddChannel } from "./AddChannel.js";
 import { ChannelList } from "./ChannelList.js";
 import { Reader } from "./Reader.js";
 
-export function App({ repo, source }: { repo: Repo; source: Source }): ReactElement {
+export function App({ repo, source, syncClient }: { repo: Repo; source: Source; syncClient?: SyncClient }): ReactElement {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeId, setActiveId] = useState<string | undefined>();
+  const [syncStatus, setSyncStatus] = useState("Подключение…");
 
   const refresh = useCallback(async () => {
     setChannels(await repo.listChannels());
@@ -17,7 +20,10 @@ export function App({ repo, source }: { repo: Repo; source: Source }): ReactElem
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    if (!syncClient) return;
+    syncClient.start(() => void refresh(), setSyncStatus);
+    return () => syncClient.stop();
+  }, [refresh, syncClient]);
 
   const open = useCallback(
     async (channel: Channel) => {
@@ -48,6 +54,8 @@ export function App({ repo, source }: { repo: Repo; source: Source }): ReactElem
       <p className="home__tagline">
         Read a Telegram channel like a book. Start at post one, continue where you left off.
       </p>
+
+      <SyncAccount repo={repo} client={syncClient} status={syncStatus} />
 
       <AddChannel
         repo={repo}

@@ -38,7 +38,10 @@ Cloudflare still processes requests as the hosting provider.
 ## Publication
 
 After approval, `npm run login` opens Cloudflare OAuth and `npm run deploy` publishes
-the Worker on `workers.dev`. Append `/tg` to the printed URL and set it as the Pages
+the Worker on `workers.dev`. Before the first Actions deployment, open Cloudflare
+Workers & Pages once to create the account's `workers.dev` subdomain. An interactive
+local `npm run deploy` can register it instead. Successful API-token verification does
+not prove that this subdomain onboarding is complete. Append `/tg` to the printed URL and set it as the Pages
 repository variable `VITE_TG_PROXY`. For local UI development, Vite's own `/tg` proxy
 is sufficient. `npm run dev` starts a local Worker; to call it from a browser on a
 different origin, configure that origin explicitly rather than using `*`.
