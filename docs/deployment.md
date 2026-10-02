@@ -9,7 +9,9 @@ during the first implementation and makes their detection part of the workflow:
 
 1. Read the Vite, PWA, browser transport and Worker boundaries before editing.
 2. Keep production publication manual. Source pushes may validate automatically.
-3. Run the reader tests and Worker gate; never infer success from the builder's report.
+3. Install with `npm ci` in a clean environment, then run the reader tests and Worker
+   gate. Declare build-time types explicitly; transitive Node types can mask a broken
+   TypeScript configuration on a developer machine. Never infer success from the builder's report.
 4. Replay the saved HTML corpus through the Worker and require a 100% score.
 5. Build both root and `/readoza/` variants. A Pages build without an HTTPS proxy
    address must fail before producing a publication artifact.
