@@ -68,6 +68,25 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
   const fillForward = useCallback(
     async (fromId: number, limit: number): Promise<StoredPost[]> => {
       let batch = await repo.getPosts(channel.id, { fromId, limit });
+      // A newly connected device has channel metadata and progress, but no posts.
+      // Fetch the saved position directly instead of crawling years of history.
+      const firstCached = channel.firstPostId === undefined
+        ? undefined : await repo.getPost(channel.id, channel.firstPostId);
+      if (!firstCached && channel.firstPostId !== undefined && fromId > channel.firstPostId) {
+        if (batch.length === 0) {
+          const near = await source.fetchPage(channel.username, { kind: "before", id: fromId + 1 });
+          if (near.posts.length) await repo.putPosts(channel.id, near.posts);
+          batch = await repo.getPosts(channel.id, { fromId, limit });
+        }
+        if (batch.length < limit) {
+          const last = batch.at(-1)?.id ?? fromId - 1;
+          const next = await source.fetchPage(channel.username, { kind: "after", id: last });
+          if (next.posts.length) await repo.putPosts(channel.id, next.posts);
+          batch = await repo.getPosts(channel.id, { fromId, limit });
+          if (!next.next && next.posts.at(-1)?.id === channel.lastPostId) setAtEnd(true);
+        }
+        return batch;
+      }
       let rounds = 0;
       while (batch.length < limit && rounds < MAX_FETCH_ROUNDS) {
         const step = await importNextPage(repo, source, channel.id);
@@ -77,7 +96,7 @@ export function useReader(repo: Repo, source: Source, channel: Channel): ReaderA
       }
       return batch;
     },
-    [repo, source, channel.id],
+    [repo, source, channel.id, channel.username, channel.firstPostId, channel.lastPostId],
   );
 
   useEffect(() => {
